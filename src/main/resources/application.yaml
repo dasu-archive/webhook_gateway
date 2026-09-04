@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: webhook-gateway
+  datasource:
+    url: jdbc:mysql://localhost:3307/webhook_gateway?serverTimezone=UTC&rewriteBatchedStatements=true
+    username: root
+    password: root
+    hikari:
+      maximum-pool-size: 20
+      pool-name: gateway-pool
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8080
+  tomcat:
+    max-http-form-post-size: 8MB
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    dev.gateway.webhook: INFO
+
+gateway:
+  admin:
+    # 비어 있으면 관리 API 인증 없음. 운영에서는 반드시 설정한다.
+    token: ""
+  receive:
+    max-body-bytes: 1048576        # 1MB. 초과 시 413. 설계 13절 "큰 페이로드" 참고
+    timestamp-tolerance: 5m        # 재전송 공격 방지 윈도우
+    secret-rotation-grace: 24h     # 구 시크릿 허용 기간
+  dispatch:
+    enabled: true
+    poll-interval: 500ms
+    batch-size: 50
+    worker-threads: 8
+    request-timeout: 10s
+    connect-timeout: 3s
+    backoff:
+      initial: 1s
+      max: 1h
+      jitter: FULL                 # FULL | DECORRELATED | NONE
+  zombie:
+    interval: 1m
+    reclaim-after: 5m              # 소비자 응답 타임아웃보다 충분히 커야 한다
