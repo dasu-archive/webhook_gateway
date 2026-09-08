@@ -1,4 +1,4 @@
-package dev.gateway.webhook.receive;
+package dev.gateway.webhook.receive.signature;
 
 import java.util.ArrayList;
 import java.util.List;

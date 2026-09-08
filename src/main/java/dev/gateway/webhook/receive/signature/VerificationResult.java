@@ -1,4 +1,4 @@
-package dev.gateway.webhook.receive;
+package dev.gateway.webhook.receive.signature;
 
 /**
  * 검증 결과. 실패 사유는 로그와 관리 API 에만 쓰고 제공자에게는 돌려주지 않는다

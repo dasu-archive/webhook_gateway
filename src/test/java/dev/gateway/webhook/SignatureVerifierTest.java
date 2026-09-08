@@ -1,10 +1,10 @@
 package dev.gateway.webhook;
 
 import dev.gateway.webhook.common.GatewayProperties;
-import dev.gateway.webhook.receive.EndpointSecrets;
-import dev.gateway.webhook.receive.GithubSignatureVerifier;
-import dev.gateway.webhook.receive.Hmac;
-import dev.gateway.webhook.receive.StandardWebhookSignatureVerifier;
+import dev.gateway.webhook.receive.signature.EndpointSecrets;
+import dev.gateway.webhook.receive.signature.GithubSignatureVerifier;
+import dev.gateway.webhook.receive.signature.Hmac;
+import dev.gateway.webhook.receive.signature.StandardWebhookSignatureVerifier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

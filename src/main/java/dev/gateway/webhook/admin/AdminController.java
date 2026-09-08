@@ -5,7 +5,7 @@ import dev.gateway.webhook.ledger.EndpointRepository;
 import dev.gateway.webhook.ledger.EventRepository;
 import dev.gateway.webhook.ledger.EventStatus;
 import dev.gateway.webhook.ledger.SignatureMode;
-import dev.gateway.webhook.receive.SignatureVerifiers;
+import dev.gateway.webhook.receive.signature.SignatureVerifiers;
 import jakarta.validation.Valid;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;

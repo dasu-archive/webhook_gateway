@@ -1,4 +1,4 @@
-package dev.gateway.webhook.receive;
+package dev.gateway.webhook.receive.signature;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

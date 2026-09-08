@@ -1,4 +1,4 @@
-package dev.gateway.webhook.receive;
+package dev.gateway.webhook.receive.signature;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
