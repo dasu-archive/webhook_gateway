@@ -1,10 +1,23 @@
+# 빌드 산출물
 .gradle/
 build/
-out/
 bin/
-*.log
+out/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
 .idea/
 *.iml
+*.iws
+*.ipr
 .vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+
+# 기타
+*.log
 .DS_Store
-docs/
+HELP.md

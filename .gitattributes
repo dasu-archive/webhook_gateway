@@ -1,0 +1,8 @@
+* text=auto
+
+# 셸 스크립트와 gradlew 는 LF 여야 리눅스·컨테이너에서 실행된다.
+gradlew text eol=lf
+*.sh text eol=lf
+
+*.bat text eol=crlf
+*.jar binary

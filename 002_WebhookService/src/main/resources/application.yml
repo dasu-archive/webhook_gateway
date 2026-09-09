@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: service
+  datasource:
+    url: jdbc:mysql://localhost:3307/webhook_service?serverTimezone=UTC&rewriteBatchedStatements=true
+    username: root
+    password: root
+    hikari:
+      maximum-pool-size: 20
+      pool-name: gateway-pool
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  mvc:
+    problemdetails:
+      enabled: true
+

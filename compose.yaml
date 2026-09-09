@@ -1,10 +1,16 @@
+# 게이트웨이 + 소비자 서비스 + MySQL 전체 스택. 저장소 루트에서 실행한다.
+#
+#   docker compose up -d --build      전체 기동
+#   000_Infra/tools/e2e.sh            엔드포인트 등록 후 웹훅 한 건 흘려보기
+#   docker compose down               정지 (데이터 유지)
+#   docker compose down -v            정지 + 데이터 삭제
+
 services:
   mysql:
     image: mysql:8.0
-    container_name: webhook-gateway-mysql
+    container_name: wg-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: webhook_gateway
       TZ: UTC
     command:
       - --character-set-server=utf8mb4
@@ -12,13 +18,50 @@ services:
       - --max_connections=300
     ports:
       - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 볼륨이 비어 있을 때만 실행된다. 스키마를 다시 만들려면 down -v 로 볼륨을 지운다.
+      - ./000_Infra/docker/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 3s
       timeout: 3s
       retries: 20
-    volumes:
-      - mysql-data:/var/lib/mysql
+
+  gateway:
+    build: ./001_WebhookGateway
+    container_name: wg-gateway
+    environment:
+      # 컨테이너 안에서 DB 는 localhost 가 아니라 서비스 이름으로 찾는다.
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/webhook_gateway?serverTimezone=UTC&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      LOGGING_LEVEL_DEV_GATEWAY_WEBHOOK: INFO
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  service:
+    build: ./002_WebhookService
+    container_name: wg-service
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/webhook_service?serverTimezone=UTC&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
 volumes:
   mysql-data:

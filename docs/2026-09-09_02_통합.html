@@ -1,0 +1,1354 @@
+<title>웹훅 게이트웨이 2차 통합</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
+
+<style>
+  /* ── 토큰 ─────────────────────────────────────────────
+     원장(ledger) 연속용지에서 가져온 팔레트.
+     중립은 초록 쪽으로 살짝 치우쳐 있다.                    */
+  :root {
+    --paper:      #F4F6F2;
+    --surface:    #FFFFFF;
+    --surface-2:  #EBEFE9;
+    --band:       rgba(46,107,82,.055);
+    --ink:        #16211D;
+    --ink-2:      #46524C;
+    --ink-3:      #6E7A74;
+    --rule:       #C9D2CB;
+    --rule-hard:  #A3B0A7;
+    --accent:     #2E6B52;
+    --accent-soft:rgba(46,107,82,.12);
+    --ok:         #2E6B52;
+    --warn:       #9A6512;
+    --dead:       #A33B2A;
+    --ok-bg:      rgba(46,107,82,.11);
+    --warn-bg:    rgba(154,101,18,.13);
+    --dead-bg:    rgba(163,59,42,.11);
+    --shadow:     0 1px 2px rgba(22,33,29,.06);
+
+    --sans: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1512;
+      --surface:    #151E1A;
+      --surface-2:  #1D2823;
+      --band:       rgba(95,181,140,.05);
+      --ink:        #E2E9E4;
+      --ink-2:      #A8B4AD;
+      --ink-3:      #7C8882;
+      --rule:       #2C3A33;
+      --rule-hard:  #435049;
+      --accent:     #6FBE95;
+      --accent-soft:rgba(111,190,149,.14);
+      --ok:         #6FBE95;
+      --warn:       #D6A254;
+      --dead:       #E08571;
+      --ok-bg:      rgba(111,190,149,.13);
+      --warn-bg:    rgba(214,162,84,.14);
+      --dead-bg:    rgba(224,133,113,.13);
+      --shadow:     0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E1512;
+    --surface:    #151E1A;
+    --surface-2:  #1D2823;
+    --band:       rgba(95,181,140,.05);
+    --ink:        #E2E9E4;
+    --ink-2:      #A8B4AD;
+    --ink-3:      #7C8882;
+    --rule:       #2C3A33;
+    --rule-hard:  #435049;
+    --accent:     #6FBE95;
+    --accent-soft:rgba(111,190,149,.14);
+    --ok:         #6FBE95;
+    --warn:       #D6A254;
+    --dead:       #E08571;
+    --ok-bg:      rgba(111,190,149,.13);
+    --warn-bg:    rgba(214,162,84,.14);
+    --dead-bg:    rgba(224,133,113,.13);
+    --shadow:     0 1px 2px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 마스트헤드 ───────────────────────────────────── */
+  .masthead {
+    border-bottom: 1px solid var(--rule-hard);
+    background: var(--surface);
+    padding: 40px 28px 0;
+  }
+  .masthead__inner { max-width: 1180px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .eyebrow span::after { content: "·"; margin-left: 10px; color: var(--rule-hard); }
+  .eyebrow span:last-child::after { content: none; }
+
+  h1 {
+    font-size: clamp(30px, 4.6vw, 46px);
+    line-height: 1.14;
+    font-weight: 600;
+    letter-spacing: -.022em;
+    margin: 14px 0 0;
+    text-wrap: balance;
+  }
+  .masthead__sub {
+    margin: 10px 0 0;
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--ink-2);
+    max-width: 60ch;
+  }
+
+  .subjects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 26px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .subjects b { color: var(--ink-2); font-weight: 500; }
+
+  /* 실측 요약 — 이 페이지의 숫자는 전부 실제로 돌려 나온 것이다 */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--rule);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    overflow: hidden;
+    margin: 26px 0 -1px;
+    background: var(--surface-2);
+  }
+  .figures > div { padding: 14px 16px; border-right: 1px solid var(--rule); }
+  .figures > div:last-child { border-right: none; }
+  .figures dt {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .figures dd {
+    margin: 3px 0 0;
+    font-family: var(--mono);
+    font-size: 21px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .figures dd small { font-size: 12px; font-weight: 400; color: var(--ink-3); }
+
+  /* ── 셸 ──────────────────────────────────────────── */
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 80px;
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
+  }
+
+  .toc {
+    position: sticky;
+    top: 24px;
+    padding: 34px 0 0;
+    font-size: 13px;
+  }
+  .toc__head {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc > ol > li { margin-top: 16px; }
+  .toc a {
+    color: var(--ink-2);
+    text-decoration: none;
+    display: block;
+    padding: 2px 0;
+    border-left: 2px solid transparent;
+  }
+  .toc a:hover { color: var(--accent); }
+  .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toc__part a {
+    font-weight: 600;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .01em;
+  }
+  .toc__sub { padding-left: 0 !important; margin-top: 4px; }
+  .toc__sub a { font-size: 12.5px; padding-left: 11px; border-left: 2px solid var(--rule); }
+  .toc__sub a:hover { border-left-color: var(--accent); }
+
+  main { padding-top: 34px; min-width: 0; }
+
+  /* ── 파트 ────────────────────────────────────────── */
+  .part { scroll-margin-top: 20px; }
+  .part + .part { margin-top: 80px; }
+  .part__head {
+    border-top: 3px solid var(--ink);
+    padding-top: 14px;
+    margin-bottom: 34px;
+  }
+  .part__no {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .part h2 {
+    font-size: 27px;
+    font-weight: 600;
+    letter-spacing: -.018em;
+    margin: 6px 0 0;
+  }
+  .part__note { margin: 8px 0 0; color: var(--ink-2); font-size: 14px; max-width: 62ch; }
+
+  section[id] { scroll-margin-top: 20px; }
+  h3 {
+    font-size: 18.5px;
+    font-weight: 600;
+    letter-spacing: -.012em;
+    margin: 46px 0 0;
+    display: flex;
+    gap: 11px;
+    align-items: baseline;
+  }
+  h3 .n {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    flex: none;
+  }
+  h4 {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 30px 0 0;
+    color: var(--ink);
+  }
+  p { margin: 13px 0 0; max-width: 68ch; }
+  main > .part p, .part section > p { max-width: 68ch; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+
+  ul.plain { margin: 13px 0 0; padding-left: 20px; max-width: 68ch; }
+  ul.plain li { margin-top: 5px; }
+
+  /* ── 코드 ────────────────────────────────────────── */
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface-2);
+    padding: .1em .34em;
+    border-radius: 3px;
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-hard);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 16px;
+    margin: 18px 0 0;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* ── 표 ─────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 20px 0 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+    min-width: 460px;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 8px;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 11.5px;
+    font-family: var(--mono);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--rule-hard);
+    padding: 0 12px 7px 0;
+    vertical-align: bottom;
+  }
+  td {
+    padding: 9px 12px 9px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  /* 원장 용지의 줄무늬 */
+  tbody tr:nth-child(even) { background: var(--band); }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; padding-right: 18px; white-space: nowrap; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 12.5px; }
+  table.tight td, table.tight th { padding-right: 10px; }
+
+  /* ── 칩 ─────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 1px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    background: var(--surface-2);
+    color: var(--ink-2);
+  }
+  .chip--ok   { background: var(--ok-bg);   color: var(--ok); }
+  .chip--warn { background: var(--warn-bg); color: var(--warn); }
+  .chip--dead { background: var(--dead-bg); color: var(--dead); }
+
+  /* ── 콜아웃: 세 등급 ─────────────────────────────── */
+  .note {
+    margin: 22px 0 0;
+    padding: 15px 18px;
+    border-left: 3px solid var(--rule-hard);
+    background: var(--surface);
+    border-radius: 0 5px 5px 0;
+    font-size: 14px;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note p { max-width: 64ch; }
+  .note__tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ink-3);
+  }
+  .note--find { border-left-color: var(--dead); background: var(--dead-bg); }
+  .note--find .note__tag { color: var(--dead); }
+  .note--caution { border-left-color: var(--warn); background: var(--warn-bg); }
+  .note--caution .note__tag { color: var(--warn); }
+
+  /* ── 그림 ───────────────────────────────────────── */
+  figure {
+    margin: 28px 0 0;
+    padding: 20px 20px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; color: var(--ink); }
+  figcaption {
+    margin-top: 14px;
+    padding-top: 11px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.6;
+  }
+  figcaption b { color: var(--ink-2); font-weight: 500; }
+
+  /* SVG 공통 — 클래스로만 칠한다. 두 테마 모두 토큰을 따른다. */
+  .d-box   { fill: var(--surface-2); stroke: var(--rule-hard); stroke-width: 1; }
+  .d-box-a { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.3; }
+  .d-line  { stroke: currentColor; fill: none; stroke-width: 1.3; }
+  .d-thin  { stroke: var(--rule-hard); fill: none; stroke-width: 1; }
+  .d-dash  { stroke-dasharray: 5 4; }
+  .d-life  { stroke: var(--rule-hard); stroke-width: 1; stroke-dasharray: 3 4; }
+  .d-t     { fill: currentColor; font-family: var(--mono); font-size: 11px; }
+  .d-t-s   { fill: var(--ink-3);  font-family: var(--mono); font-size: 10px; }
+  .d-t-h   { fill: currentColor; font-family: var(--sans); font-size: 12.5px; font-weight: 600; }
+  .d-ok    { fill: var(--ok);   }
+  .d-oks   { stroke: var(--ok);   fill: none; stroke-width: 1.6; }
+  .d-warns { stroke: var(--warn); fill: none; stroke-width: 1.6; }
+  .d-deads { stroke: var(--dead); fill: none; stroke-width: 1.6; }
+  .d-warn  { fill: var(--warn); }
+  .d-dead  { fill: var(--dead); }
+  .d-bar   { fill: var(--accent); }
+  .d-bar-w { fill: var(--warn); }
+  .d-grid  { stroke: var(--rule); stroke-width: 1; }
+  .d-fill-ok   { fill: var(--ok-bg);   stroke: var(--ok);   stroke-width: 1.2; }
+  .d-fill-warn { fill: var(--warn-bg); stroke: var(--warn); stroke-width: 1.2; }
+  .d-fill-dead { fill: var(--dead-bg); stroke: var(--dead); stroke-width: 1.2; }
+
+  /* ── 우선순위 목록 ───────────────────────────────── */
+  .queue { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .queue li { background: var(--surface); padding: 13px 16px; display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 14px; align-items: baseline; }
+  .queue .rank { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink-3); }
+  .queue .task { font-weight: 600; font-size: 14.5px; }
+  .queue .why { color: var(--ink-2); font-size: 13.5px; display: block; margin-top: 2px; }
+  .queue li.hot { box-shadow: inset 3px 0 0 var(--dead); }
+  .queue li.hot .rank { color: var(--dead); }
+
+  footer {
+    border-top: 1px solid var(--rule-hard);
+    margin-top: 10px;
+    padding: 26px 28px 60px;
+    color: var(--ink-3);
+    font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  footer div { max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 22px; }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; }
+    .toc { position: static; padding-top: 26px; }
+    .toc > ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+    .toc > ol > li { margin-top: 0; }
+    .figures { grid-template-columns: repeat(2, 1fr); }
+    .figures > div:nth-child(2) { border-right: none; }
+    .figures > div:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+    .masthead { padding: 30px 20px 0; }
+    .shell { padding: 0 20px 60px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<header class="masthead">
+  <div class="masthead__inner">
+    <p class="eyebrow"><span>2026-09-09</span><span>2차 작업</span><span>402 WebhookGateway</span></p>
+    <h1>웹훅 게이트웨이 2차 통합</h1>
+    <p class="masthead__sub">게이트웨이 한 박스였던 1차에 <b>실제 결제 도메인을 가진 소비자</b>를 붙이고 compose 로 묶었다. 이 문서의 숫자는 전부 스택을 띄워 실제로 돌려 나온 것이다.</p>
+
+    <ul class="subjects">
+      <li><b>게이트웨이</b> 001_WebhookGateway @ 4584b93</li>
+      <li><b>소비자</b> 002_WebhookService @ cc413e3</li>
+      <li><b>통합 스택</b> 루트 compose · 버전 관리 밖</li>
+    </ul>
+
+    <dl class="figures">
+      <div><dt>자동화 테스트</dt><dd>31 <small>+</small> 26 <small>통과</small></dd></div>
+      <div><dt>수신 지연 p99</dt><dd>38.6 <small>ms</small></dd></div>
+      <div><dt>40초 다운 복구</dt><dd>8 <small>/ 8 시도</small></dd></div>
+      <div><dt>중복 결제</dt><dd>0 <small>건</small></dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="목차">
+    <p class="toc__head">목차</p>
+    <ol>
+      <li class="toc__part">
+        <a href="#part-1">I. 구현 기록</a>
+        <ol class="toc__sub">
+          <li><a href="#s-diff">1차와 달라진 것</a></li>
+          <li><a href="#s-flow">전 구간 흐름</a></li>
+          <li><a href="#s-gateway">게이트웨이 판정</a></li>
+          <li><a href="#s-consumer">소비자 로직</a></li>
+          <li><a href="#s-contract">두 서비스의 계약</a></li>
+          <li><a href="#s-dedup">3단 중복 방어</a></li>
+          <li><a href="#s-decisions">이번에 정한 결정</a></li>
+        </ol>
+      </li>
+      <li class="toc__part">
+        <a href="#part-2">II. 검증 결과</a>
+        <ol class="toc__sub">
+          <li><a href="#s-tests">자동화 테스트</a></li>
+          <li><a href="#s-scenarios">실측 시나리오</a></li>
+          <li><a href="#s-retry">재시도 곡선</a></li>
+          <li><a href="#s-latency">수신 지연</a></li>
+          <li><a href="#s-unmeasured">아직 못 잰 것</a></li>
+        </ol>
+      </li>
+      <li class="toc__part">
+        <a href="#part-3">III. 남은 과제</a>
+        <ol class="toc__sub">
+          <li><a href="#s-queue">우선순위</a></li>
+          <li><a href="#s-new">새로 드러난 것</a></li>
+          <li><a href="#s-carry">1차에서 이월</a></li>
+          <li><a href="#s-stack">스택 자체의 문제</a></li>
+          <li><a href="#s-live">인지해야 하는 것</a></li>
+        </ol>
+      </li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ══════════════════════════ PART I ══════════════════════════ -->
+  <article class="part" id="part-1">
+    <div class="part__head">
+      <p class="part__no">Part I</p>
+      <h2>구현 기록</h2>
+      <p class="part__note">게이트웨이 내부는 1차 문서에 있다. 여기서 새로 적는 것은 <b>소비자 로직과 두 서비스 사이의 계약</b>이다.</p>
+    </div>
+
+    <section id="s-diff">
+      <h3><span class="n">1</span> 1차와 달라진 것</h3>
+      <p>1차(2026-09-04)의 소비자는 응답 코드를 마음대로 바꾸는 목 서버였다. 검증 구성은 폐쇄 루프였다. 이번에 소비자를 <strong>실제 도메인을 가진 별도 애플리케이션</strong>으로 만들었다. 게이트웨이가 "소비자가 멱등해야 한다"고 계속 말해온 그 멱등성을, 이번엔 소비자 쪽에서 구현했다.</p>
+
+      <div class="tw">
+      <table>
+        <thead><tr><th></th><th>1차 · 2026-09-04</th><th>2차 · 2026-09-09</th></tr></thead>
+        <tbody>
+          <tr><td>소비자</td><td>목 서버</td><td><b>계좌 · 주문 · 결제 도메인</b></td></tr>
+          <tr><td>실행</td><td>bootRun + 목 서버 수동 기동</td><td class="mono">docker compose up -d</td></tr>
+          <tr><td>DB</td><td class="mono">webhook_gateway</td><td class="mono">webhook_gateway / webhook_service</td></tr>
+          <tr><td>전 구간 확인</td><td>수동 curl 조합</td><td class="mono">tools/e2e.sh</td></tr>
+          <tr><td>중복 방어</td><td>2단</td><td><b>3단</b> — 소비자 <code>processed_event</code> 추가</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>게이트웨이 코드는 서명 검증기를 <code>receive/signature</code> 하위 패키지로 분리한 것 외에 기능 변경이 없다.</p>
+    </section>
+
+    <section id="s-flow">
+      <h3><span class="n">2</span> 웹훅 한 건이 실제로 어떻게 흐르는가</h3>
+
+      <figure>
+        <svg viewBox="0 0 880 530" role="img" aria-label="웹훅 한 건의 전 구간 시퀀스. 제공자는 원장 저장까지만 기다리고 200을 받은 뒤 끊어지며, 소비자로의 전달은 그 뒤 별도의 폴링 사이클에서 일어난다.">
+          <!-- 레인 헤더 -->
+          <rect class="d-box" x="20"  y="8" width="130" height="30" rx="4"/>
+          <rect class="d-box-a" x="215" y="8" width="150" height="30" rx="4"/>
+          <rect class="d-box" x="440" y="8" width="140" height="30" rx="4"/>
+          <rect class="d-box" x="680" y="8" width="180" height="30" rx="4"/>
+          <text class="d-t-h" x="85"  y="28" text-anchor="middle">제공자</text>
+          <text class="d-t-h" x="290" y="28" text-anchor="middle">게이트웨이</text>
+          <text class="d-t-h" x="510" y="28" text-anchor="middle">원장 MySQL</text>
+          <text class="d-t-h" x="770" y="28" text-anchor="middle">소비자 서비스</text>
+
+          <!-- 라이프라인 -->
+          <line class="d-life" x1="85"  y1="42" x2="85"  y2="515"/>
+          <line class="d-life" x1="290" y1="42" x2="290" y2="515"/>
+          <line class="d-life" x1="510" y1="42" x2="510" y2="515"/>
+          <line class="d-life" x1="770" y1="42" x2="770" y2="515"/>
+
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/>
+            </marker>
+          </defs>
+
+          <!-- ① 수신 -->
+          <text class="d-t" x="90" y="66">POST /webhooks/svc-payment</text>
+          <text class="d-t-s" x="90" y="80">X-Hub-Signature-256 · 원본 바이트</text>
+          <line class="d-line" x1="85" y1="90" x2="284" y2="90" marker-end="url(#ah)"/>
+
+          <text class="d-t-s" x="296" y="112">엔드포인트 · 크기 · HMAC · 멱등키</text>
+          <path class="d-thin" d="M290,118 h26 a6,6 0 0 1 6,6 v10 a6,6 0 0 1 -6,6 h-26" marker-end="url(#ah)"/>
+
+          <text class="d-t" x="300" y="158">INSERT event (PENDING)</text>
+          <line class="d-line" x1="290" y1="168" x2="504" y2="168" marker-end="url(#ah)"/>
+
+          <text class="d-t d-ok" x="118" y="196">200 accepted</text>
+          <line class="d-oks d-dash" x1="290" y1="206" x2="91" y2="206" marker-end="url(#ah-ok)"/>
+
+          <!-- 시간축 분리 -->
+          <line class="d-thin d-dash" x1="20" y1="238" x2="860" y2="238"/>
+          <rect class="d-box" x="286" y="226" width="330" height="24" rx="12"/>
+          <text class="d-t" x="451" y="242" text-anchor="middle">시간축 분리 — 제공자와의 대화는 끝났다</text>
+          <text class="d-t-s" x="20" y="264">여기까지 실측 p99 38.6ms. 이 뒤로 무슨 일이 있어도 제공자가 보는 응답 시간은 변하지 않는다.</text>
+
+          <!-- ② 클레임 -->
+          <text class="d-t" x="300" y="300">claimBatch — FOR UPDATE SKIP LOCKED</text>
+          <line class="d-line" x1="290" y1="310" x2="504" y2="310" marker-end="url(#ah)"/>
+          <text class="d-t-s" x="24" y="314">500ms 폴링</text>
+          <path class="d-thin" d="M108,296 h-14 a6,6 0 0 0 -6,6 v10 a6,6 0 0 0 6,6 h14" marker-end="url(#ah)"/>
+
+          <text class="d-t-s" x="300" y="336">id 목록 · status=DELIVERING · attempt_count += 1</text>
+          <line class="d-thin d-dash" x1="510" y1="344" x2="296" y2="344" marker-end="url(#ah)"/>
+
+          <!-- ③ 전달 -->
+          <text class="d-t" x="300" y="378">POST /webhook/receiver</text>
+          <text class="d-t-s" x="300" y="392">X-Gateway-Event-Id · 원본 바디 그대로</text>
+          <line class="d-line" x1="290" y1="402" x2="764" y2="402" marker-end="url(#ah)"/>
+
+          <text class="d-t-s" x="776" y="424">processed_event 조회 → 기록 + 잔액 차감</text>
+          <path class="d-thin" d="M770,430 h26 a6,6 0 0 1 6,6 v10 a6,6 0 0 1 -6,6 h-26" marker-end="url(#ah)"/>
+
+          <text class="d-t d-ok" x="600" y="470">200</text>
+          <line class="d-oks d-dash" x1="770" y1="480" x2="296" y2="480" marker-end="url(#ah-ok)"/>
+
+          <text class="d-t" x="300" y="506">DELIVERED · delivery_attempt 기록</text>
+          <line class="d-line" x1="290" y1="514" x2="504" y2="514" marker-end="url(#ah)"/>
+        </svg>
+        <figcaption><b>수신과 전달은 다른 시간축에 있다.</b> 제공자는 원장 저장까지만 기다린다. 소비자가 느리든 죽어 있든 제공자가 보는 응답 시간은 변하지 않는다 — 설계가 FM-1 로 부른 실패 모드다.</figcaption>
+      </figure>
+    </section>
+
+    <section id="s-gateway">
+      <h3><span class="n">3</span> 게이트웨이 판정</h3>
+      <p>응답 코드는 전부 하나의 질문으로 결정된다. <strong>"제공자가 다시 보내게 할 것인가."</strong></p>
+
+      <div class="tw">
+      <table class="tight">
+        <caption>수신 판정 — 위에서부터 순서대로</caption>
+        <thead><tr><th>검사</th><th>실패 시</th><th>왜 그 코드인가</th></tr></thead>
+        <tbody>
+          <tr><td>slug 조회 · enabled</td><td><span class="chip chip--dead">404</span></td><td>없는 주소다. 다시 보내도 없다</td></tr>
+          <tr><td>바디 ≤ 1MB</td><td><span class="chip chip--dead">413</span></td><td>같은 크기로 다시 와도 같다</td></tr>
+          <tr><td>검증기 존재</td><td><span class="chip chip--warn">500</span></td><td>우리 설정 오류다. 재시도를 받는 편이 유실보다 낫다</td></tr>
+          <tr><td>HMAC 서명</td><td><span class="chip chip--dead">401</span></td><td>다시 와도 틀리다. <b>사유는 응답에 담지 않는다</b></td></tr>
+          <tr><td>INSERT event</td><td><span class="chip chip--ok">200</span> duplicate</td><td>유니크 위반 = 이미 받았다. 200 이어야 제공자 재시도가 멈춘다</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>바디를 <code>byte[]</code> 로 받는 이유는 재직렬화하면 HMAC 이 원천적으로 깨지기 때문이다. DB 쓰기는 이 경로에 정확히 한 번뿐이다.</p>
+
+      <figure>
+        <svg viewBox="0 0 880 300" role="img" aria-label="원장 이벤트의 상태 기계. PENDING에서 claimBatch로 DELIVERING이 되고, 2xx면 DELIVERED, 4xx나 재시도 소진이면 DEAD, 5xx면 백오프 후 PENDING으로 돌아가며, 프로세스가 죽어 DELIVERING에 고착된 행은 좀비 회수가 PENDING으로 되돌린다.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="a2-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/>
+            </marker>
+            <marker id="a2-dead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--dead)"/>
+            </marker>
+            <marker id="a2-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--warn)"/>
+            </marker>
+          </defs>
+
+          <!-- 수신 진입 -->
+          <text class="d-t-s" x="14" y="146">수신</text>
+          <line class="d-line" x1="14" y1="154" x2="76" y2="154" marker-end="url(#a2)"/>
+
+          <!-- 노드 -->
+          <rect class="d-box" x="82"  y="138" width="118" height="34" rx="5"/>
+          <text class="d-t-h" x="141" y="159" text-anchor="middle">PENDING</text>
+
+          <rect class="d-box-a" x="330" y="138" width="130" height="34" rx="5"/>
+          <text class="d-t-h" x="395" y="159" text-anchor="middle">DELIVERING</text>
+
+          <rect class="d-fill-ok" x="672" y="60" width="140" height="34" rx="5"/>
+          <text class="d-t-h d-ok" x="742" y="81" text-anchor="middle">DELIVERED</text>
+
+          <rect class="d-fill-dead" x="672" y="218" width="140" height="34" rx="5"/>
+          <text class="d-t-h d-dead" x="742" y="239" text-anchor="middle">DEAD</text>
+
+          <!-- PENDING → DELIVERING -->
+          <line class="d-line" x1="200" y1="155" x2="324" y2="155" marker-end="url(#a2)"/>
+          <text class="d-t" x="262" y="146" text-anchor="middle">claimBatch</text>
+          <text class="d-t-s" x="262" y="174" text-anchor="middle">attempt_count += 1</text>
+
+          <!-- → DELIVERED -->
+          <path class="d-oks" d="M460,148 C 550,148 570,77 666,77" marker-end="url(#a2-ok)"/>
+          <text class="d-t d-ok" x="556" y="104" text-anchor="middle">2xx</text>
+
+          <!-- → DEAD -->
+          <path class="d-deads" d="M460,163 C 550,163 570,235 666,235" marker-end="url(#a2-dead)"/>
+          <text class="d-t d-dead" x="562" y="200" text-anchor="middle">4xx (408·429 제외)</text>
+          <text class="d-t d-dead" x="562" y="214" text-anchor="middle">attempt ≥ max_attempts</text>
+
+          <!-- 백오프 되돌림 -->
+          <path class="d-warns" d="M382,172 C 382,232 160,232 147,178" marker-end="url(#a2-warn)"/>
+          <text class="d-t d-warn" x="265" y="248" text-anchor="middle">5xx · 408 · 429 · 예외 → 백오프</text>
+
+          <!-- 좀비 회수 -->
+          <path class="d-line d-dash" d="M382,138 C 382,86 160,86 147,132" marker-end="url(#a2)"/>
+          <text class="d-t" x="265" y="76" text-anchor="middle">좀비 회수 — updated_at 5분 초과</text>
+        </svg>
+        <figcaption><code>attempt_count</code> 는 <b>집는 순간</b> 올린다. 그래서 프로세스가 죽어 회수된 건도 시도 한 번을 소진한다. <code>max_attempts</code> 는 "성공한 시도"가 아니라 <b>"시작한 시도"의 상한</b>이다.</figcaption>
+      </figure>
+
+      <p>전달 판정에서 <code>408</code> 과 <code>429</code> 만 4xx 중 예외다. "지금은 안 된다"는 뜻이라 재시도가 유효하다. 이 둘을 DEAD 로 보내면 소비자가 스로틀링을 켜기만 해도 이벤트를 잃는다.</p>
+      <pre><code>boolean permanent = status &gt;= 400 &amp;&amp; status &lt; 500 &amp;&amp; status != 408 &amp;&amp; status != 429;</code></pre>
+    </section>
+
+    <section id="s-consumer">
+      <h3><span class="n">4</span> 소비자 로직 — 이번에 새로 만든 것</h3>
+
+      <h4>중복일 때 예외를 던지지 않는 것이 핵심이다</h4>
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th>중복에 무엇을 돌려주면</th><th>게이트웨이가 하는 일</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip chip--dead">4xx</span></td><td>데드레터로 보낸다 — <b>정상 처리한 건이 DEAD 가 된다</b></td></tr>
+          <tr><td><span class="chip chip--warn">5xx</span></td><td>max_attempts 까지 계속 때린다</td></tr>
+          <tr><td><span class="chip chip--ok">200</span></td><td>재시도가 멈춘다 ✅</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p><strong>기록과 결제가 한 트랜잭션인 것도 핵심이다.</strong> <code>@Transactional</code> 이 없으면 결제가 실패해도 처리 기록만 남고, 재시도가 그 기록에 걸려 중복으로 스킵되면서 <strong>결제가 영영 유실된다.</strong></p>
+
+      <p>이 성질 덕분에 잔액 부족이나 없는 주문은 롤백되어 <code>processed_event</code> 에 아무것도 남지 않는다. 나중에 충전하고 재생하면 다시 처리할 수 있다 — 실측으로 확인했다.</p>
+
+      <h4>응답 코드는 게이트웨이에 대한 지시다</h4>
+      <p>기준은 하나다. <strong>"똑같은 요청을 다시 보내면 성공할 가능성이 있는가."</strong></p>
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th>상황</th><th>예외</th><th>응답</th><th>게이트웨이 판정</th></tr></thead>
+        <tbody>
+          <tr><td>정상 · 중복</td><td class="mono">—</td><td><span class="chip chip--ok">200</span></td><td>DELIVERED</td></tr>
+          <tr><td>없는 주문</td><td class="mono">OrderNotFoundException</td><td><span class="chip chip--dead">400</span></td><td>DEAD 즉시</td></tr>
+          <tr><td>없는 계좌</td><td class="mono">AccountNotFoundException</td><td><span class="chip chip--dead">400</span></td><td>DEAD 즉시</td></tr>
+          <tr><td>잔액 부족</td><td class="mono">InsufficientBalanceException</td><td><span class="chip chip--dead">422</span></td><td>DEAD 즉시</td></tr>
+          <tr><td>이벤트 ID 헤더 누락</td><td class="mono">(Spring)</td><td><span class="chip chip--dead">400</span></td><td>DEAD 즉시</td></tr>
+          <tr><td>orderId 누락</td><td class="mono">(Bean Validation)</td><td><span class="chip chip--dead">400</span></td><td>DEAD 즉시</td></tr>
+          <tr><td>그 밖</td><td class="mono">—</td><td><span class="chip chip--warn">500</span></td><td>재시도 → 소진 시 DEAD</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>이 판단을 뒤집으면 대가가 크다. 4xx 를 5xx 로 두면 영원히 실패할 요청을 계속 받고, 5xx 를 4xx 로 두면 살릴 수 있는 이벤트를 버린다.</p>
+    </section>
+
+    <section id="s-contract">
+      <h3><span class="n">5</span> 두 서비스의 계약</h3>
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th class="mono">헤더</th><th>값</th><th>소비자가 쓰는가</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">X-Gateway-Event-Id</td><td>원장의 event.id</td><td><b>필수로 쓴다</b> — 중복 제거 키</td></tr>
+          <tr><td class="mono">X-Gateway-Endpoint</td><td>endpoint slug</td><td>로깅만</td></tr>
+          <tr><td class="mono">X-Gateway-Attempt</td><td>몇 번째 시도인가 (첫 전달이 1)</td><td>로깅만</td></tr>
+          <tr><td class="mono">X-Gateway-Received-At</td><td>게이트웨이 수신 시각</td><td>안 쓴다</td></tr>
+          <tr><td class="mono">X-Gateway-Idempotency-Source</td><td>PROVIDER_ID / BODY_HASH</td><td>안 쓴다</td></tr>
+          <tr><td class="mono">X-Gateway-Replay</td><td>재생 이벤트인가 (현재 항상 false)</td><td>안 쓴다</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>원본 헤더는 <strong>화이트리스트가 아니라 최소 블록리스트</strong>로 거른다. hop-by-hop, <code>Host</code>/<code>Content-Length</code>, 자격 증명, <code>X-Gateway-*</code> 만 뺀다. 화이트리스트를 못 쓰는 이유는 <strong>무엇이 서명 헤더인지 제공자마다 다르고 미리 다 알 수 없기</strong> 때문이다.</p>
+
+      <div class="note note--caution">
+        <span class="note__tag">전제가 깨져 있다</span>
+        <p>이 PASSTHROUGH 설계는 <b>소비자가 원 제공자의 서명을 재검증한다는 전제</b> 위에 서 있다. 지금 소비자는 그 검증을 하지 않는다 — <a href="#s-new">Part III 1절</a>.</p>
+      </div>
+    </section>
+
+    <section id="s-dedup">
+      <h3><span class="n">6</span> 중복이 걸러지는 3개 지점</h3>
+
+      <figure>
+        <svg viewBox="0 0 880 250" role="img" aria-label="3단 중복 방어. 제공자가 보낸 20건이 게이트웨이 유니크 인덱스에서 1건으로 줄고, SKIP LOCKED가 워커 간 중복 클레임을 막고, 소비자의 processed_event PK가 전달 구간의 중복을 막아 결제는 정확히 한 번 일어난다.">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="a3-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/>
+            </marker>
+          </defs>
+
+          <text class="d-t" x="12" y="112">제공자 20건</text>
+          <line class="d-line" x1="12" y1="122" x2="128" y2="122" marker-end="url(#a3)"/>
+
+          <!-- 1단 -->
+          <rect class="d-box-a" x="134" y="94" width="164" height="56" rx="5"/>
+          <text class="d-t-h" x="216" y="116" text-anchor="middle">1단 · 수신</text>
+          <text class="d-t-s" x="216" y="134" text-anchor="middle">uk_event_idem</text>
+
+          <path class="d-thin d-dash" d="M216,150 v42" marker-end="url(#a3-d)"/>
+          <text class="d-t-s" x="222" y="208">19건 → 200 duplicate</text>
+
+          <text class="d-t" x="308" y="112">1건</text>
+          <line class="d-line" x1="298" y1="122" x2="352" y2="122" marker-end="url(#a3)"/>
+
+          <!-- 2단 -->
+          <rect class="d-box-a" x="358" y="94" width="164" height="56" rx="5"/>
+          <text class="d-t-h" x="440" y="116" text-anchor="middle">2단 · 전달</text>
+          <text class="d-t-s" x="440" y="134" text-anchor="middle">SKIP LOCKED</text>
+
+          <path class="d-thin d-dash" d="M440,150 v42" marker-end="url(#a3-d)"/>
+          <text class="d-t-s" x="446" y="208">다른 워커는 못 집는다</text>
+
+          <line class="d-line" x1="522" y1="122" x2="576" y2="122" marker-end="url(#a3)"/>
+
+          <!-- 3단 -->
+          <rect class="d-fill-ok" x="582" y="94" width="164" height="56" rx="5"/>
+          <text class="d-t-h d-ok" x="664" y="116" text-anchor="middle">3단 · 소비자</text>
+          <text class="d-t-s" x="664" y="134" text-anchor="middle">processed_event PK</text>
+
+          <path class="d-thin d-dash" d="M664,150 v42" marker-end="url(#a3-d)"/>
+          <text class="d-t-s" x="670" y="208">타임아웃 재시도 · 좀비 회수</text>
+
+          <line class="d-line" x1="746" y1="122" x2="800" y2="122" marker-end="url(#a3)"/>
+          <text class="d-t d-ok" x="806" y="118">결제</text>
+          <text class="d-t d-ok" x="806" y="132">1회</text>
+
+          <text class="d-t-s" x="12" y="34">각 단이 막는 중복의 출처가 다르다 — 하나라도 빠지면 나머지가 완벽해도 결제가 두 번 일어난다.</text>
+          <line class="d-thin" x1="12" y1="48" x2="868" y2="48"/>
+          <text class="d-t-s" x="216" y="70" text-anchor="middle">제공자의 재시도</text>
+          <text class="d-t-s" x="440" y="70" text-anchor="middle">워커 간 경합</text>
+          <text class="d-t-s" x="664" y="70" text-anchor="middle">게이트웨이→소비자 구간</text>
+        </svg>
+        <figcaption><b>3단이 없으면 나머지 둘이 완벽해도 결제가 두 번 일어난다.</b> 소비자가 처리는 했는데 응답이 타임아웃된 경우, POST 후 응답 전에 게이트웨이가 죽은 경우, 200 이 네트워크에서 유실된 경우 — 전부 2단을 통과한 뒤에 생기는 중복이다.</figcaption>
+      </figure>
+
+      <p><strong>게이트웨이는 exactly-once 를 제공하지 않는다.</strong> 분산 트랜잭션 없이는 불가능하고, <code>at-least-once + 소비자 멱등성</code>이 유일한 실용적 해법이다. 3단은 선택이 아니라 필수다.</p>
+    </section>
+
+    <section id="s-decisions">
+      <h3><span class="n">7</span> 이번에 정한 결정</h3>
+
+      <h4>잔액 부족을 422 로 둔다 — 갈릴 수 있는 판단</h4>
+      <p>충전을 기대해 5xx 로 재시도를 받는 선택도 가능하다. 그러나 게이트웨이 백오프의 상한이 1시간이라 충전을 기다리기엔 짧고, 그동안 워커 하나를 붙잡는다. 결제 실패는 인프라 재시도가 아니라 <strong>사용자에게 알려 해결할 일</strong>이라고 보고 4xx 를 택했다.</p>
+
+      <h4>차감 금액은 페이로드가 아니라 DB 에서 읽는다</h4>
+      <p><code>PaymentEvent.amount</code> 는 받기만 하고 쓰지 않는다. <code>account.withdraw(order.getAmount())</code> 다. 웹훅 바디는 외부에서 온 값이라 금액의 출처가 되면 안 된다. <strong>서명이 유효해도 마찬가지다</strong> — 서명은 "제공자가 보냈다"를 증명할 뿐 "금액이 맞다"를 증명하지 않는다.</p>
+
+      <h4>이벤트 ID 헤더가 없으면 받지 않는다</h4>
+      <p>중복 제거를 할 수 없는 요청을 받아 처리하면 <strong>결제가 몇 번 일어날지 아무도 모른다.</strong> 받아서 잘못 처리하는 것보다 거부하고 데드레터에 남기는 편이 낫다.</p>
+
+      <h4>MySQL 은 한 인스턴스, 스키마만 나눈다</h4>
+      <p>두 서비스가 논리적으로 완전히 분리되어 있다 — FK 도 조인도 없다. 인스턴스를 나누면 검증 환경만 무거워진다. 배포에서 갈라야 한다면 커넥션 문자열만 바꾸면 된다.</p>
+
+      <div class="tw">
+      <table class="tight">
+        <caption>그 밖</caption>
+        <thead><tr><th>결정</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>포트/어댑터 없이 Spring Data 직접 사용</td><td>도메인이 JPA 를 알게 되는 대신 클래스 수가 절반. 게이트웨이 검증용 소비자라 택한 타협</td></tr>
+          <tr><td>멀티스테이지 Dockerfile</td><td>의존성 해석과 소스 컴파일을 나눠 캐시를 살린다. 실행은 JRE 로</td></tr>
+          <tr><td class="mono">sed -i 's/\r$//' gradlew</td><td>Windows 에서 만든 gradlew 가 CRLF 라 그대로 두면 컨테이너에서 exec 이 실패한다</td></tr>
+          <tr><td class="mono">targetUrl = http://service:8081</td><td>컨테이너 안에서 DB·소비자는 localhost 가 아니라 서비스 이름으로 해석된다</td></tr>
+          <tr><td>소비자 테스트도 Testcontainers MySQL</td><td>검증 대상이 PK 충돌 동작이라 H2 로 대체할 수 없다</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+  </article>
+
+  <!-- ══════════════════════════ PART II ══════════════════════════ -->
+  <article class="part" id="part-2">
+    <div class="part__head">
+      <p class="part__no">Part II</p>
+      <h2>검증 결과</h2>
+      <p class="part__note">1차와 결정적으로 다른 점은 <b>소비자가 목이 아니라 진짜라는 것</b>이다. 목 소비자는 "5xx 를 뱉어라"고 시킬 수 있었지만, 진짜 소비자는 자기 도메인 규칙에 따라 응답 코드를 정한다.</p>
+    </div>
+
+    <section id="s-tests">
+      <h3><span class="n">1</span> 자동화 테스트</h3>
+      <pre><code>001_WebhookGateway   ./gradlew test            →  31 tests, 실패 0, BUILD SUCCESSFUL in 54s
+002_WebhookService   ./gradlew cleanTest test  →  26 tests, 실패 0, BUILD SUCCESSFUL in 55s</code></pre>
+
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th></th><th>클래스</th><th class="mono">수</th><th>무엇을 지키는가</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4">게이트웨이</td><td class="mono">SignatureVerifierTest</td><td class="num">8</td><td>서명 검증의 세 논점</td></tr>
+          <tr><td class="mono">BackoffCalculatorTest</td><td class="num">5</td><td>백오프와 지터 3종</td></tr>
+          <tr><td class="mono">ReceiveIntegrationTest</td><td class="num">8</td><td>원본 보존과 중복 차단</td></tr>
+          <tr><td class="mono">DispatchIntegrationTest</td><td class="num">10</td><td>전달 판정과 좀비 회수</td></tr>
+          <tr><td rowspan="5">소비자</td><td class="mono">AccountTest</td><td class="num">5</td><td>잔액 규칙 (경계값 포함)</td></tr>
+          <tr><td class="mono">PaymentServiceTest</td><td class="num">5</td><td>결제 유스케이스, <b>페이로드 금액 무시</b></td></tr>
+          <tr><td class="mono">WebhookReceiverTest</td><td class="num">4</td><td>중복 제거, 중복 시 예외 없음</td></tr>
+          <tr><td class="mono">WebhookControllerTest</td><td class="num">6</td><td>응답 코드 매핑</td></tr>
+          <tr><td class="mono">PaymentWebhookIntegrationTest</td><td class="num">5</td><td>MySQL 위에서 전 구간</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>양쪽 통합 테스트 모두 Testcontainers MySQL 위에서 돈다. H2 로 대체할 수 없다 — 게이트웨이는 <code>FOR UPDATE SKIP LOCKED</code>(8.0 전용)와 유니크 인덱스가, 소비자는 PK 충돌 동작이 <strong>검증 대상 그 자체</strong>이기 때문이다.</p>
+    </section>
+
+    <section id="s-scenarios">
+      <h3><span class="n">2</span> 실측 시나리오</h3>
+      <p>전부 컨테이너 3개를 띄워 실제로 돌린 결과다.</p>
+
+      <div class="tw">
+      <table>
+        <thead><tr><th>시나리오</th><th>결과</th><th>무엇을 증명하나</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>정상 경로 <span class="chip">e2e.sh</span></td>
+            <td class="mono">DELIVERED · attempt 1<br>잔액 5000 → 4000</td>
+            <td>전 구간이 이어진다</td>
+          </tr>
+          <tr>
+            <td>같은 이벤트 20건</td>
+            <td class="mono">accepted 1 · duplicate 19<br>소비자 도달 1건</td>
+            <td><b>1단</b> — 유니크 인덱스가 19건을 삽입 단계에서 떨궜다</td>
+          </tr>
+          <tr>
+            <td>소비자에 직접 3회<br><span class="chip">게이트웨이 우회</span></td>
+            <td class="mono">200 · 200 · 200<br>결제 1회</td>
+            <td><b>3단</b> — 1차에서는 확인 불가능했던 항목. 목 소비자엔 멱등성이 없었다</td>
+          </tr>
+          <tr>
+            <td>잔액 부족 (500 &lt; 1000)</td>
+            <td class="mono">422 → DEAD · attempt 1<br>처리 기록 0건</td>
+            <td>max_attempts 8 인데 한 번에 끝났다. <b>롤백돼 재생 가능성이 남는다</b></td>
+          </tr>
+          <tr>
+            <td>없는 주문</td>
+            <td class="mono">400 → DEAD · attempt 1<br>처리 기록 0건</td>
+            <td>같은 이유</td>
+          </tr>
+          <tr>
+            <td>위조 서명 / 없는 엔드포인트<br>/ 서명 헤더 없음</td>
+            <td class="mono">401 / 404 / 401</td>
+            <td>거부 경로. 401 본문에 사유는 없다</td>
+          </tr>
+          <tr>
+            <td>100건 순차 유입</td>
+            <td class="mono">100건 전부 도달<br>중복 0</td>
+            <td>소진까지 미전달 0</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>2단(<code>SKIP LOCKED</code>)은 실측으로 직접 보이지 않는다. 워커가 8개인데 이벤트가 적어 경합이 일어나지 않기 때문이다. <code>DispatchIntegrationTest</code> 가 이것을 검증한다.</p>
+
+      <div class="note note--find">
+        <span class="note__tag">실측으로 확인된 구멍</span>
+        <p>서명 없이 <code>http://localhost:8081/webhook/receiver</code> 로 직접 POST 하니 <b>HTTP 200 에 잔액이 5000 → 4000 으로 차감됐다.</b> 버그가 아니라 지금 구조가 그렇게 되어 있는 것이고, 가장 크게 벌어진 구멍이다.</p>
+      </div>
+    </section>
+
+    <section id="s-retry">
+      <h3><span class="n">3</span> 재시도 곡선 — 가장 많은 것을 알려준 시나리오</h3>
+      <p><code>docker compose stop -t 1 service</code> 로 소비자를 실제로 죽이고 웹훅을 쏜 뒤 40초 후 되살렸다.</p>
+
+      <figure>
+        <svg viewBox="0 0 880 400" role="img" aria-label="소비자 40초 다운 시나리오의 재시도 타임라인과 간격 막대. 8회 시도 중 7회가 ConnectException으로 실패하고 61.1초 시점의 8번째 시도에서 200을 받았다. 간격은 4819, 1574, 1061, 2579, 8120, 20440, 22473 밀리초로 단조증가하지 않는다.">
+          <defs>
+            <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- 다운 구간 -->
+          <text class="d-t-h" x="0" y="16">타임라인</text>
+          <rect class="d-fill-dead" x="56" y="30" width="451" height="22" rx="3"/>
+          <text class="d-t-s d-dead" x="64" y="45">소비자 정지 (약 41초)</text>
+          <rect class="d-fill-ok" x="507" y="30" width="313" height="22" rx="3"/>
+          <text class="d-t-s d-ok" x="515" y="45">재기동</text>
+
+          <!-- 축 -->
+          <line class="d-thin" x1="56" y1="96" x2="836" y2="96"/>
+          <g class="d-t-s">
+            <text x="56"  y="118" text-anchor="middle">0s</text>
+            <text x="166" y="118" text-anchor="middle">10s</text>
+            <text x="276" y="118" text-anchor="middle">20s</text>
+            <text x="386" y="118" text-anchor="middle">30s</text>
+            <text x="496" y="118" text-anchor="middle">40s</text>
+            <text x="606" y="118" text-anchor="middle">50s</text>
+            <text x="716" y="118" text-anchor="middle">60s</text>
+          </g>
+          <g class="d-grid">
+            <line x1="166" y1="92" x2="166" y2="100"/><line x1="276" y1="92" x2="276" y2="100"/>
+            <line x1="386" y1="92" x2="386" y2="100"/><line x1="496" y1="92" x2="496" y2="100"/>
+            <line x1="606" y1="92" x2="606" y2="100"/><line x1="716" y1="92" x2="716" y2="100"/>
+          </g>
+
+          <!-- 시도 마커: x = 56 + t*11 -->
+          <g>
+            <circle class="d-fill-dead" cx="56"  cy="96" r="6"/><text class="d-t-s" x="56"  y="82" text-anchor="middle">1</text>
+            <circle class="d-fill-dead" cx="109" cy="96" r="6"/><text class="d-t-s" x="109" y="82" text-anchor="middle">2</text>
+            <circle class="d-fill-dead" cx="126" cy="96" r="6"/><text class="d-t-s" x="126" y="68" text-anchor="middle">3</text>
+            <circle class="d-fill-dead" cx="138" cy="96" r="6"/><text class="d-t-s" x="140" y="82" text-anchor="middle">4</text>
+            <circle class="d-fill-dead" cx="166" cy="96" r="6"/><text class="d-t-s" x="166" y="68" text-anchor="middle">5</text>
+            <circle class="d-fill-dead" cx="256" cy="96" r="6"/><text class="d-t-s" x="256" y="82" text-anchor="middle">6</text>
+            <circle class="d-fill-dead" cx="481" cy="96" r="6"/><text class="d-t-s" x="481" y="82" text-anchor="middle">7</text>
+            <circle class="d-fill-ok"   cx="728" cy="96" r="7"/><text class="d-t-s d-ok" x="728" y="82" text-anchor="middle">8</text>
+          </g>
+          <text class="d-t d-ok" x="748" y="100">200 · DELIVERED · 61.1s</text>
+
+          <!-- 간격 막대 -->
+          <text class="d-t-h" x="0" y="160">시도 간 간격 (ms) — 지터 FULL</text>
+          <line class="d-thin" x1="56" y1="340" x2="836" y2="340"/>
+          <g class="d-grid">
+            <line x1="56" y1="180" x2="836" y2="180"/>
+            <line x1="56" y1="260" x2="836" y2="260"/>
+          </g>
+          <g class="d-t-s">
+            <text x="48" y="184" text-anchor="end">20,000</text>
+            <text x="48" y="264" text-anchor="end">10,000</text>
+            <text x="48" y="344" text-anchor="end">0</text>
+          </g>
+
+          <!-- 스케일: y = 340 - ms*0.008  (22473 → 160) -->
+          <g>
+            <rect class="d-bar-w" x="72"  y="301" width="86" height="39" rx="2"/>
+            <rect class="d-bar-w" x="180" y="327" width="86" height="13" rx="2"/>
+            <rect class="d-bar-w" x="288" y="332" width="86" height="8"  rx="2"/>
+            <rect class="d-bar-w" x="396" y="319" width="86" height="21" rx="2"/>
+            <rect class="d-bar"   x="504" y="275" width="86" height="65" rx="2"/>
+            <rect class="d-bar"   x="612" y="177" width="86" height="163" rx="2"/>
+            <rect class="d-bar"   x="720" y="160" width="86" height="180" rx="2"/>
+          </g>
+          <g class="d-t-s">
+            <text x="115" y="296" text-anchor="middle">4,819</text>
+            <text x="223" y="322" text-anchor="middle">1,574</text>
+            <text x="331" y="327" text-anchor="middle">1,061</text>
+            <text x="439" y="314" text-anchor="middle">2,579</text>
+            <text x="547" y="270" text-anchor="middle">8,120</text>
+            <text x="655" y="172" text-anchor="middle">20,440</text>
+            <text x="763" y="155" text-anchor="middle">22,473</text>
+          </g>
+          <g class="d-t-s">
+            <text x="115" y="356" text-anchor="middle">1→2</text>
+            <text x="223" y="356" text-anchor="middle">2→3</text>
+            <text x="331" y="356" text-anchor="middle">3→4</text>
+            <text x="439" y="356" text-anchor="middle">4→5</text>
+            <text x="547" y="356" text-anchor="middle">5→6</text>
+            <text x="655" y="356" text-anchor="middle">6→7</text>
+            <text x="763" y="356" text-anchor="middle">7→8</text>
+          </g>
+
+          <path class="d-thin" d="M331,376 L331,362" marker-end="url(#a4)"/>
+          <text class="d-t-s" x="338" y="382">3→4 가 2→3 보다 짧다 — 지터가 작동한 증거다. random(0, base) 를 뽑기 때문이다.</text>
+        </svg>
+        <figcaption>8회 중 7회가 <code>ConnectException</code>, 8번째에 <span class="chip chip--ok">200</span>. 최종 <b>DELIVERED · attempt_count 8</b>, 잔액은 정확히 1회만 차감됐다. 간격이 단조증가하지 않는 것이 지터가 작동한 증거다.</figcaption>
+      </figure>
+
+      <div class="note note--find">
+        <span class="note__tag">여기서 나온 문제</span>
+        <p><b>8번째 시도에서 성공했다. 한 번만 더 실패했으면 DEAD 였다.</b></p>
+        <div class="tw">
+        <table class="tight">
+          <thead><tr><th>8회로 커버되는 시간</th><th class="mono">값</th></tr></thead>
+          <tbody>
+            <tr><td>지터 없음 (NONE) — 1+2+4+8+16+32+64</td><td class="num">127초</td></tr>
+            <tr><td>FULL 지터 기댓값 — 각 구간이 random(0, base)</td><td class="num">63.5초</td></tr>
+            <tr><td><b>실측</b></td><td class="num"><b>61.1초</b></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p><code>FULL</code> 지터는 thundering herd 를 막는 대신 <b>같은 시도 횟수로 커버할 수 있는 다운타임을 절반으로 줄인다.</b> 백오프 상한이 1시간이어도 근처에 가보지 못하고 소진된다.</p>
+        <p>즉 지금 설정은 <b>소비자가 1분 넘게 다운되면 이벤트가 데드레터로 간다.</b> 게이트웨이를 만든 이유가 "소비자 사정이 잠깐 나쁠 때 대신 붙들고 있는 것"인데, 그 '잠깐'이 1분이라는 뜻이다. 배포 한 번에 이벤트가 다 죽는다.</p>
+      </div>
+
+      <h4>부수 관찰</h4>
+      <ul class="plain">
+        <li><code>duration_ms</code> 가 시도마다 갈린다: <b>3,746 / 2 / 2 / 1 / 3 / 3,725 / 3,729ms</b>. 즉시 커넥션 거부(1~3ms)와 연결 타임아웃(≈3.7초, <code>connect-timeout: 3s</code>)이 섞였다. 컨테이너 정지 직후 도커 네트워크 상태에 따라 갈리는 것으로 보이는데 <b>단정할 수 없다.</b> 중요한 것은 타임아웃이 걸린 시도가 그만큼 워커를 붙잡는다는 점이다.</li>
+        <li><code>event.last_backoff_ms</code> 는 컬럼이 하나라 <b>시도별 백오프 이력이 남지 않는다.</b> 위 간격은 전부 <code>delivery_attempt.started_at</code> 차이로 역산한 값이다.</li>
+      </ul>
+    </section>
+
+    <section id="s-latency">
+      <h3><span class="n">4</span> 수신 지연 — 1차가 "미측정"으로 남긴 항목</h3>
+
+      <figure>
+        <svg viewBox="0 0 880 210" role="img" aria-label="수신 응답 지연 분포. min 13.3, p50 18.5, p90 26.9, p99 38.6, max 40.4 밀리초로 모두 설계 목표인 50밀리초 아래에 있다.">
+          <!-- 스케일: x = 120 + ms * 13.6  (55ms → 868) -->
+          <g class="d-grid">
+            <line x1="120" y1="30" x2="120" y2="176"/>
+            <line x1="256" y1="30" x2="256" y2="176"/>
+            <line x1="392" y1="30" x2="392" y2="176"/>
+            <line x1="528" y1="30" x2="528" y2="176"/>
+            <line x1="664" y1="30" x2="664" y2="176"/>
+          </g>
+          <g class="d-t-s">
+            <text x="120" y="196" text-anchor="middle">0</text>
+            <text x="256" y="196" text-anchor="middle">10ms</text>
+            <text x="392" y="196" text-anchor="middle">20ms</text>
+            <text x="528" y="196" text-anchor="middle">30ms</text>
+            <text x="664" y="196" text-anchor="middle">40ms</text>
+          </g>
+
+          <!-- 목표선 50ms -->
+          <line class="d-deads d-dash" x1="800" y1="24" x2="800" y2="180"/>
+          <text class="d-t d-dead" x="806" y="38">설계 목표</text>
+          <text class="d-t d-dead" x="806" y="52">p99 50ms</text>
+
+          <!-- 막대 -->
+          <g>
+            <rect class="d-bar" x="120" y="34"  width="181" height="20" rx="2"/>
+            <rect class="d-bar" x="120" y="62"  width="252" height="20" rx="2"/>
+            <rect class="d-bar" x="120" y="90"  width="366" height="20" rx="2"/>
+            <rect class="d-bar" x="120" y="118" width="525" height="20" rx="2"/>
+            <rect class="d-bar" x="120" y="146" width="549" height="20" rx="2"/>
+          </g>
+          <g class="d-t-s">
+            <text x="112" y="49"  text-anchor="end">min</text>
+            <text x="112" y="77"  text-anchor="end">p50</text>
+            <text x="112" y="105" text-anchor="end">p90</text>
+            <text x="112" y="133" text-anchor="end">p99</text>
+            <text x="112" y="161" text-anchor="end">max</text>
+          </g>
+          <g class="d-t">
+            <text x="309" y="49">13.3</text>
+            <text x="380" y="77">18.5</text>
+            <text x="494" y="105">26.9</text>
+            <text x="653" y="133">38.6</text>
+            <text x="677" y="161">40.4</text>
+          </g>
+        </svg>
+        <figcaption>서로 다른 이벤트로 순차 100회 발사. <b>설계 6.4 의 목표 p99 50ms 를 만족한다.</b></figcaption>
+      </figure>
+
+      <div class="note note--caution">
+        <span class="note__tag">이 숫자를 과신하면 안 된다</span>
+        <div class="tw">
+        <table class="tight">
+          <tbody>
+            <tr><td>순차 100회다</td><td>동시 요청이 없다. <b>부하 상황이 아니다</b></td></tr>
+            <tr><td>curl 왕복 기준이다</td><td>프로세스 기동과 커넥션 수립이 포함된다. 서버 처리 시간만이 아니다</td></tr>
+            <tr><td>표본이 100개다</td><td>p99 를 말하기엔 얇다. 사실상 상위 1~2개 값이다</td></tr>
+            <tr><td>로컬 도커다</td><td>네트워크 지연이 사실상 0 이다</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p><b>부하 도구(k6 등)로 다시 재야 한다.</b> 이 값은 "구조적으로 느리지는 않다" 정도의 근거다.</p>
+      </div>
+    </section>
+
+    <section id="s-unmeasured">
+      <h3><span class="n">5</span> 아직 못 잰 것</h3>
+      <div class="tw">
+      <table>
+        <thead><tr><th>측정</th><th>무엇이 결정되나</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td>부하 상황의 수신 지연</td><td>동시 요청에서의 p99 가 진짜 숫자다</td><td><span class="chip chip--warn">부분</span></td></tr>
+          <tr><td>지터 3종 복구 곡선 비교</td><td>기본 지터와 max_attempts</td><td><span class="chip chip--warn">FULL 만</span></td></tr>
+          <tr><td>워커 수별 폴링 부하와 락 경합</td><td><b>DB 큐 → 브로커 전환 기준</b></td><td><span class="chip">미측정</span></td></tr>
+          <tr><td class="mono">idx_event_dispatch 잠금 범위</td><td>SKIP LOCKED 가 갭 락으로 넓게 잠그는지</td><td><span class="chip">미측정</span></td></tr>
+          <tr><td>페이로드 크기별 지연</td><td>오브젝트 스토리지 분리 임계값</td><td><span class="chip">미측정</span></td></tr>
+          <tr><td>소비자 동시 중복 요청</td><td><b>Part III 1.2 의 안전성</b></td><td><span class="chip">미측정</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>마지막 항목이 이번에 새로 생겼다. 나머지는 설계 10.2 가 적은 그대로다 — <em>"이 부분은 실측 전까지 불확실하다."</em> 아직 불확실한 채다.</p>
+    </section>
+  </article>
+
+  <!-- ══════════════════════════ PART III ══════════════════════════ -->
+  <article class="part" id="part-3">
+    <div class="part__head">
+      <p class="part__no">Part III</p>
+      <h2>남은 과제</h2>
+      <p class="part__note">1차에서 이월된 것과 이번에 새로 드러난 것이 섞여 있다.</p>
+    </div>
+
+    <section id="s-queue">
+      <h3><span class="n">1</span> 우선순위</h3>
+      <ol class="queue">
+        <li class="hot"><span class="rank">1</span><span><span class="task">소비자 8081 을 비공개로</span><span class="why">한 줄이고, 지금 가장 큰 구멍을 절반 막는다</span></span></li>
+        <li class="hot"><span class="rank">1b</span><span><span class="task">재시도 예산 재설정</span><span class="why">설정 한 줄. 지금 1분 다운에 이벤트를 잃는다</span></span></li>
+        <li class="hot"><span class="rank">2</span><span><span class="task">소비자 서명 검증 또는 resign</span><span class="why">신뢰 경계를 세운다. 구멍의 나머지 절반</span></span></li>
+        <li><span class="rank">3</span><span><span class="task">시크릿 암호화</span><span class="why">2번에서 resign 을 택하면 선행 조건이 된다</span></span></li>
+        <li><span class="rank">4</span><span><span class="task">멱등키 정리 배치 — 게이트웨이 + 소비자</span><span class="why">안 하면 시간이 지날수록 반드시 나빠진다</span></span></li>
+        <li><span class="rank">5</span><span><span class="task">부하 측정</span><span class="why">설계가 "미측정"으로 남긴 판단들이 여기서 확정된다</span></span></li>
+        <li><span class="rank">6</span><span><span class="task">서킷 브레이커 · 재생</span><span class="why">5번의 결과가 임계값을 정해준다</span></span></li>
+      </ol>
+      <p><strong>가장 먼저 할 것은 1번과 1b 다.</strong> 둘 다 설정 한 줄인데, 하나는 서명 없이 결제되는 경로를 좁히고 하나는 1분 다운에 이벤트를 잃는 것을 막는다. 기능을 만들기 전에 이미 벌어져 있는 것부터 닫는 것이 순서다.</p>
+    </section>
+
+    <section id="s-new">
+      <h3><span class="n">2</span> 이번에 새로 드러난 것</h3>
+
+      <h4>2.1 소비자가 서명을 검증하지 않는다 — 가장 큰 구멍</h4>
+      <p><code>002_WebhookService</code> 어디에도 HMAC·서명·시크릿 관련 코드가 없다. <code>X-Gateway-Event-Id</code> 헤더와 <code>orderId</code> 만 있으면 <strong>누구의 요청이든 결제한다.</strong> compose 가 8081 을 호스트에 노출하는 것이 이 구멍을 실제로 도달 가능하게 만든다.</p>
+
+      <figure>
+        <svg viewBox="0 0 880 200" role="img" aria-label="신뢰 경계 도식. 제공자에서 게이트웨이로 오는 경로는 서명 검증을 하지만, 게이트웨이에서 소비자로 가는 경로와 외부에서 소비자로 직접 오는 경로는 아무 검증이 없어 누구나 결제를 일으킬 수 있다.">
+          <defs>
+            <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="a5-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--dead)"/>
+            </marker>
+          </defs>
+
+          <rect class="d-box" x="16" y="52" width="128" height="42" rx="5"/>
+          <text class="d-t-h" x="80" y="78" text-anchor="middle">제공자</text>
+
+          <rect class="d-box-a" x="292" y="52" width="150" height="42" rx="5"/>
+          <text class="d-t-h" x="367" y="78" text-anchor="middle">게이트웨이 :8080</text>
+
+          <rect class="d-box" x="600" y="52" width="150" height="42" rx="5"/>
+          <text class="d-t-h" x="675" y="78" text-anchor="middle">소비자 :8081</text>
+
+          <rect class="d-fill-ok" x="800" y="52" width="70" height="42" rx="5"/>
+          <text class="d-t-h d-ok" x="835" y="78" text-anchor="middle">결제</text>
+
+          <line class="d-line" x1="144" y1="73" x2="286" y2="73" marker-end="url(#a5)"/>
+          <text class="d-t d-ok" x="215" y="64" text-anchor="middle">HMAC 검증 ✓</text>
+
+          <line class="d-line" x1="442" y1="73" x2="594" y2="73" marker-end="url(#a5)"/>
+          <text class="d-t d-dead" x="518" y="64" text-anchor="middle">검증 없음</text>
+
+          <line class="d-line" x1="750" y1="73" x2="794" y2="73" marker-end="url(#a5)"/>
+
+          <rect class="d-fill-dead" x="292" y="146" width="150" height="38" rx="5"/>
+          <text class="d-t-h d-dead" x="367" y="170" text-anchor="middle">아무나</text>
+          <path class="d-deads d-dash" d="M442,165 C 560,165 580,110 660,100" marker-end="url(#a5-d)"/>
+          <text class="d-t d-dead" x="560" y="146" text-anchor="middle">서명 없이 직접 · 실측 200</text>
+        </svg>
+        <figcaption>PASSTHROUGH 모드로 원본 서명 헤더를 넘기는 이유는 <b>소비자가 그 헤더로 재검증하기 때문</b>인데, 그 전제가 성립하지 않는다. 지금은 신뢰 경계가 아예 없다.</figcaption>
+      </figure>
+
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th>선택지</th><th>내용</th><th>비용</th></tr></thead>
+        <tbody>
+          <tr><td><b>C. 포트 비공개</b></td><td>compose 에서 8081 을 expose 로만 두고 ports 를 뺀다</td><td><b>한 줄 · 지금 당장</b></td></tr>
+          <tr><td>A. 소비자가 원 서명 재검증</td><td>X-Hub-Signature-256 을 자기 시크릿으로 검증</td><td>소비자에 시크릿 관리가 생긴다</td></tr>
+          <tr><td>B. 게이트웨이가 재서명 (resign)</td><td>소비자는 게이트웨이만 믿는다</td><td>재생과 한 묶음. 시크릿 암호화가 선행</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>C 는 방어가 아니라 <strong>노출 축소</strong>다. 그것만으로 끝내면 안 된다 — 같은 네트워크 안이면 여전히 아무나 부를 수 있다. B 를 택하면 <strong>신뢰 경계가 이동한다.</strong> 소비자는 이제 GitHub 을 믿는 것이 아니라 게이트웨이를 믿는다.</p>
+
+      <h4>2.2 소비자 중복 방어가 DB 격리 수준에 의존한다</h4>
+      <p><code>ProcessedEvent</code> 는 <code>@Id</code> 가 애플리케이션이 채우는 String 이다. Spring Data JPA 의 <code>save()</code> 는 <code>isNew()</code>(= id 가 null 인가)로 분기하므로 <strong><code>persist</code> 가 아니라 <code>merge</code> 로 돈다</strong> — SELECT 한 번 후 INSERT 또는 UPDATE.</p>
+      <pre><code>REPEATABLE READ (MySQL 기본값) — 안전
+  tx1: existsById 없음 → merge → INSERT
+  tx2: existsById 없음 → merge → SELECT 없음(스냅샷) → INSERT → duplicate key
+       → 롤백 → 500 → 게이트웨이 재시도 → existsById 에 걸림 → 200
+  결과: 결제 1회
+
+READ COMMITTED — 깨진다
+  tx2: merge 의 SELECT 가 방금 커밋된 행을 본다 → UPDATE → 성공
+       → processPayment 그대로 실행 → 중복 결제</code></pre>
+      <p>지금 당장 문제는 아니지만 <strong>안전성의 근거가 코드가 아니라 DB 설정에 있다.</strong> <code>Persistable&lt;String&gt;</code> 을 구현해 <code>isNew()</code> 를 <code>true</code> 로 고정하거나 네이티브 INSERT 로 바꾸면 격리 수준과 무관해진다.</p>
+      <div class="note">
+        <span class="note__tag">확인 필요</span>
+        <p>코드를 읽고 추론한 것이다. 동시 요청으로 이 경로를 실제로 밟아보지 않았다. <b>고치기 전에 재현 테스트부터 쓰는 것이 순서다.</b></p>
+      </div>
+
+      <h4>2.3 재시도 예산이 1분짜리다</h4>
+      <p><a href="#s-retry">Part II 3절</a>에서 나온 것이다. 해야 할 것은 셋 중 하나가 아니라 조합이다.</p>
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th>방법</th><th>효과</th><th>대가</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">max_attempts → 12~15</td><td>커버 시간이 지수적으로 는다</td><td>데드레터 진입이 늦어진다</td></tr>
+          <tr><td class="mono">jitter: DECORRELATED</td><td>random(initial, prev×3) 이라 평균 대기가 더 길다</td><td>복구 곡선이 달라진다 — 비교 측정 필요</td></tr>
+          <tr><td class="mono">backoff.max → 5m</td><td>후반 시도가 촘촘해진다</td><td>소비자 압력이 는다</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>어느 조합이 맞는지는 지터 3종 복구 곡선을 비교해야 정해진다. 다만 <strong>지금 값이 명백히 짧다는 것은 이미 실측으로 나왔으므로</strong>, 측정 전이라도 <code>max_attempts</code> 를 올려두는 편이 낫다.</p>
+
+      <h4>2.4 X-Gateway-Event-Id 가 게이트웨이 auto_increment 다</h4>
+      <p>게이트웨이 DB 를 초기화하면(<code>docker compose down -v</code>) id 가 1부터 다시 시작하는데, 소비자의 <code>processed_event</code> 가 남아 있으면 <strong>새 이벤트가 중복으로 오인되어 조용히 스킵된다.</strong> 로그는 <code>debug</code> 라 보이지도 않는다. <code>tools/e2e.sh</code> 가 매번 <code>DELETE FROM processed_event</code> 를 하는 것이 사실상 이 문제의 우회다. 게이트웨이가 UUID 를 함께 발급하면 사라진다.</p>
+
+      <h4>2.5 시도별 백오프 이력이 남지 않는다</h4>
+      <p><code>event.last_backoff_ms</code> 는 컬럼이 하나라 항상 마지막 값만 있다. 지터 3종을 비교하려면(2.3) <strong>시도별 대기 시간이 그대로 남아야 한다.</strong> <code>delivery_attempt</code> 에 <code>backoff_ms</code> 컬럼을 추가하는 것이 맞다.</p>
+
+      <h4>2.6 소비자에도 정리 배치가 없다</h4>
+      <p><code>processed_event</code> 는 무한히 쌓인다. 게이트웨이의 멱등키 정리 배치와 같은 문제인데, 보관 기간의 근거가 다르다.</p>
+      <div class="tw">
+      <table class="tight">
+        <thead><tr><th></th><th>보관 기간의 근거</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">게이트웨이 event</td><td>제공자의 재시도 윈도우</td></tr>
+          <tr><td class="mono">소비자 processed_event</td><td><b>게이트웨이의 재시도 윈도우</b> = max_attempts × 백오프 상한</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>2.3 에서 <code>max_attempts</code> 를 올리면 이 값도 같이 늘어야 한다. 짧게 잡으면 아직 재시도 중인 이벤트의 기록이 지워져 중복 결제가 난다.</p>
+    </section>
+
+    <section id="s-carry">
+      <h3><span class="n">3</span> 1차에서 그대로 넘어온 것</h3>
+      <div class="tw">
+      <table>
+        <thead><tr><th>항목</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td><b>멱등키 정리 배치</b></td><td>retention_days 컬럼만 있고 지우는 코드가 없다. 이제 소비자 쪽도 필요하다</td></tr>
+          <tr><td><b>시크릿 평문 저장</b></td><td class="mono">secret_current VARBINARY 에 원문 그대로. 2.1 에서 B 를 택하면 선행 조건</td></tr>
+          <tr><td><b>데드레터 알림 부재</b></td><td>log.error 한 줄뿐. <b>이번 검증에서 DEAD 2건이 생겼는데 아무도 모른다</b></td></tr>
+          <tr><td><b>재생 미구현</b></td><td>원본은 쌓이는데 흘릴 수단이 없다. FM-6 이 안 막혔다</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>데드레터 알림은 이번에 체감됐다. 검증 시나리오를 돌리는 것만으로 데드레터가 2건 생겼고, <code>GET /admin/stats</code> 를 직접 치지 않으면 알 방법이 없었다.</p>
+    </section>
+
+    <section id="s-stack">
+      <h3><span class="n">4</span> 통합 스택 자체의 문제</h3>
+      <div class="tw">
+      <table>
+        <thead><tr><th>문제</th><th>조치</th></tr></thead>
+        <tbody>
+          <tr><td><b>루트 자산이 버전 관리 밖이다</b><br><span class="chip">compose.yaml · docker/ · tools/ · 이 문서</span></td><td>루트를 git init 하거나 게이트웨이 저장소로 옮긴다</td></tr>
+          <tr><td><b>검증 시나리오가 스크립트로 안 남았다</b></td><td>이 문서의 숫자를 재현할 수단이 저장소에 없다. <code>tools/scenarios.sh</code> 로 커밋</td></tr>
+          <tr><td>게이트웨이 Dockerfile 이 미커밋</td><td>001 에 <code>??</code> 로 남아 있다 (소비자 쪽은 커밋됨)</td></tr>
+          <tr><td>소비자에 healthcheck 가 없다</td><td>actuator 추가 + compose healthcheck</td></tr>
+          <tr><td>Spring Boot 버전이 다르다 <span class="chip">3.5.0 / 4.1.1</span></td><td>지금은 무해. 공통 라이브러리를 쓰기 시작하면 맞춰야 한다</td></tr>
+          <tr><td>e2e 시드가 도메인 불변식을 우회한다</td><td>INSERT 직접 실행이라 amount &gt; 0 검사를 안 탄다. 인지만</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="s-live">
+      <h3><span class="n">5</span> 해결이 아니라 인지해야 하는 것</h3>
+      <p>구현으로 없앨 수 없는 것들이다. 없애려 하지 말고 문서와 소비자 가이드에 계속 남겨야 한다.</p>
+      <div class="tw">
+      <table>
+        <thead><tr><th>한계</th><th>왜 못 없애나</th></tr></thead>
+        <tbody>
+          <tr><td>exactly-once 를 제공하지 않는다</td><td>분산 트랜잭션 없이 불가능하다. at-least-once + 소비자 멱등성이 유일한 실용적 해법이다</td></tr>
+          <tr><td>순서를 보장하지 않는다</td><td>설계 12.2 의 의도적 제외. 소비자가 이벤트 시각으로 판정해야 한다</td></tr>
+          <tr><td>제공자 이벤트 ID 가 없으면 멱등성이 근사치다</td><td>바디 해시는 정상 중복 액션을 오판할 수 있다</td></tr>
+          <tr><td>재생은 소비자 멱등성 없이 안전하지 않다</td><td>부작용을 게이트웨이 단독으로 막을 수 없다</td></tr>
+          <tr><td><b>게이트웨이가 단일 장애점이다</b></td><td>FM-2 를 풀려고 만든 물건이 같은 문제를 자기 자신에게 갖는다</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>마지막 항목은 인지로 끝나지 않고 <strong>가용성 설계가 필요한 항목</strong>이다. 전달부가 <code>SKIP LOCKED</code> 로 이미 다중 워커를 견디도록 되어 있어 <strong>수평 확장 자체는 지금 구조에서 가능하다.</strong> 검증은 폴링 부하 측정과 함께 해야 한다.</p>
+    </section>
+  </article>
+
+  </main>
+</div>
+
+<footer>
+  <div>
+    <span>2026-09-09 · 2차 작업</span>
+    <span>게이트웨이 4584b93 · 소비자 cc413e3</span>
+    <span>실측 환경: Docker 28.0.1 · MySQL 8.0 · Java 21</span>
+  </div>
+</footer>
