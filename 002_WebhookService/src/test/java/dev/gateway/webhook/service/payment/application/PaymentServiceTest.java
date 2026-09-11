@@ -41,7 +41,7 @@ class PaymentServiceTest {
         // given
         Account account = new Account(1L, 5_000);
         when(orderRepository.findById(123L)).thenReturn(Optional.of(new Order(123L, 1L, 1_000)));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountRepository.findForUpdate(1L)).thenReturn(Optional.of(account));
 
         // when
         paymentService.processPayment(123L);
@@ -57,7 +57,7 @@ class PaymentServiceTest {
         // 실제 차감은 우리 원장의 주문 금액을 따른다.
         Account account = new Account(1L, 5_000);
         when(orderRepository.findById(123L)).thenReturn(Optional.of(new Order(123L, 1L, 2_500)));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountRepository.findForUpdate(1L)).thenReturn(Optional.of(account));
 
         paymentService.processPayment(123L);
 
@@ -78,7 +78,7 @@ class PaymentServiceTest {
     @DisplayName("주문은 있는데 계좌가 없으면 AccountNotFoundException")
     void throwsWhenAccountMissing() {
         when(orderRepository.findById(123L)).thenReturn(Optional.of(new Order(123L, 7L, 1_000)));
-        when(accountRepository.findById(7L)).thenReturn(Optional.empty());
+        when(accountRepository.findForUpdate(7L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> paymentService.processPayment(123L))
                 .isInstanceOf(AccountNotFoundException.class);
@@ -89,7 +89,7 @@ class PaymentServiceTest {
     void propagatesInsufficientBalance() {
         Account account = new Account(1L, 500);
         when(orderRepository.findById(123L)).thenReturn(Optional.of(new Order(123L, 1L, 1_000)));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountRepository.findForUpdate(1L)).thenReturn(Optional.of(account));
 
         assertThatThrownBy(() -> paymentService.processPayment(123L))
                 .isInstanceOf(InsufficientBalanceException.class);

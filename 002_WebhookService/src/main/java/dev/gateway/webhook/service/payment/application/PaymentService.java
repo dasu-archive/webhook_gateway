@@ -26,13 +26,16 @@ public class PaymentService {
 
     /**
      * 주문 금액만큼 주문자의 계좌에서 대금을 차감한다.
+     *
+     * <p>계좌는 잠그고 읽는다({@link AccountRepository#findForUpdate}). 잠그지 않으면 같은 계좌로 동시에 온
+     * 결제들이 차감을 서로 덮어써, 처리 기록은 남는데 돈은 덜 빠진다.
      */
     @Transactional
     public void processPayment(long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        Account account = accountRepository.findById(order.getAccountId())
+        Account account = accountRepository.findForUpdate(order.getAccountId())
                 .orElseThrow(() -> new AccountNotFoundException(order.getAccountId()));
 
         account.withdraw(order.getAmount());
