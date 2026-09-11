@@ -57,6 +57,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/webhook_service?serverTimezone=UTC&rewriteBatchedStatements=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
+      # 카오스 제어(/chaos/response-drop)를 켠다. 드롭률 기본값이 0 이라 켜 두기만 해서는 아무 일도 없다.
+      WEBHOOK_CHAOS_ENABLED: "true"
     # 호스트에 포트를 열지 않는다. 소비자는 서명 검증이 없어 열어 두면 게이트웨이를 거치지 않은
     # 결제 경로가 생긴다. 게이트웨이는 같은 네트워크에서 service:8081 로 부른다.
     depends_on:
