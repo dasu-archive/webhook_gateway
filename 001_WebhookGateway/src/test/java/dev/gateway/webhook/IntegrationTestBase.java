@@ -25,9 +25,14 @@ import org.testcontainers.containers.MySQLContainer;
 })
 public abstract class IntegrationTestBase {
 
+    /**
+     * 운영 설정(application.yaml 의 serverTimezone=UTC)과 같게 맞춘다. 안 맞추면 드라이버가
+     * Timestamp 를 JVM 기본 시간대로 보내, UTC 로 도는 NOW(3) 와 시간대 차이만큼 어긋난다.
+     */
     @ServiceConnection
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
-            .withDatabaseName("webhook_gateway");
+            .withDatabaseName("webhook_gateway")
+            .withUrlParam("connectionTimeZone", "UTC");
 
     static {
         MYSQL.start();
@@ -40,6 +45,7 @@ public abstract class IntegrationTestBase {
     void truncateLedger() {
         jdbc.sql("DELETE FROM delivery_attempt").update();
         jdbc.sql("DELETE FROM event").update();
+        jdbc.sql("DELETE FROM replay").update();
         jdbc.sql("DELETE FROM endpoint").update();
     }
 }

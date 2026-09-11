@@ -26,8 +26,7 @@ import java.util.Map;
 /**
  * 관리 평면. 설계 5절 — 수신/전달 흐름 바깥에 있다.
  *
- * <p>MVP 범위는 엔드포인트 등록·시크릿 로테이션·원장 조회까지다.
- * 재생(설계 9절)은 v1 에서 이 컨트롤러에 붙는다.
+ * <p>엔드포인트 등록·시크릿 로테이션·멱등 선언·원장 조회. 재생은 {@code ReplayController}(/admin/replays)가 맡는다.
  */
 @RestController
 @RequestMapping("/admin")
@@ -91,6 +90,17 @@ public class AdminController {
     public AdminDto.EndpointView setEnabled(@PathVariable String slug, @RequestParam boolean value) {
         Endpoint endpoint = require(slug);
         endpoints.setEnabled(endpoint.id(), value);
+        return AdminDto.EndpointView.of(endpoints.findById(endpoint.id()).orElseThrow());
+    }
+
+    /**
+     * 소비자가 X-Gateway-Event-Id 로 멱등 처리한다는 선언. 재생 가드 4번의 근거다.
+     * 게이트웨이는 이걸 검증할 수 없다. 선언을 기록하고, 선언이 없으면 재생을 막을 뿐이다.
+     */
+    @PostMapping("/endpoints/{slug}/idempotency")
+    public AdminDto.EndpointView confirmIdempotency(@PathVariable String slug, @RequestParam boolean confirmed) {
+        Endpoint endpoint = require(slug);
+        endpoints.setIdempotencyConfirmed(endpoint.id(), confirmed);
         return AdminDto.EndpointView.of(endpoints.findById(endpoint.id()).orElseThrow());
     }
 

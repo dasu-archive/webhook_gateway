@@ -111,14 +111,15 @@ public class EventDispatcher {
         builder.header(ATTEMPT_HEADER, String.valueOf(event.attemptCount()));
         builder.header(RECEIVED_AT_HEADER, DateTimeFormatter.ISO_INSTANT.format(event.receivedAt()));
         builder.header(IDEMPOTENCY_SOURCE_HEADER, event.idempotencySource().name());
-        builder.header(REPLAY_HEADER, String.valueOf(event.replayOf() != null));
+        // 재생은 같은 행을 다시 보낸다. 이벤트 ID 는 그대로이고 이 헤더만 true 가 된다.
+        builder.header(REPLAY_HEADER, String.valueOf(event.replayCount() > 0));
         return builder.build();
     }
 
     private void handleResponse(Event event, Endpoint endpoint, int status, long durationMs, Instant startedAt) {
         FailureClass failureClass = FailureClassifier.ofStatus(status);
         if (failureClass == FailureClass.SUCCESS) {
-            events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
+            events.recordAttempt(event.id(), event.attemptCount(), event.lastReplayId(), startedAt, durationMs,
                     status, DeliveryOutcome.DELIVERED, failureClass, null, null);
             events.markDelivered(event.id());
             log.debug("전달 성공 event={} status={} {}ms", event.id(), status, durationMs);
@@ -138,7 +139,7 @@ public class EventDispatcher {
         boolean exhausted = event.attemptCount() >= maxAttempts;
 
         if (permanent || exhausted) {
-            events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
+            events.recordAttempt(event.id(), event.attemptCount(), event.lastReplayId(), startedAt, durationMs,
                     status, DeliveryOutcome.DEAD, failureClass, null, error);
             events.markDead(event.id());
             // 데드레터 진입 자체가 알림 이벤트다(설계 8.5). 알림 없는 데드레터는 아무도 보지 않는 무덤이 된다.
@@ -150,7 +151,7 @@ public class EventDispatcher {
         }
 
         Duration delay = backoff.next(event.attemptCount(), event.lastBackoffMs());
-        events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
+        events.recordAttempt(event.id(), event.attemptCount(), event.lastReplayId(), startedAt, durationMs,
                 status, DeliveryOutcome.RETRY, failureClass, delay.toMillis(), error);
         events.scheduleRetry(event.id(), clock.instant().plus(delay), delay.toMillis());
         log.debug("재시도 예약 event={} attempt={}/{} delay={}ms 사유={}",

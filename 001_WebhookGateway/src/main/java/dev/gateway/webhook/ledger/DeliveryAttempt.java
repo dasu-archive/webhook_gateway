@@ -6,6 +6,8 @@ public record DeliveryAttempt(
         long id,
         long eventId,
         int attemptNo,
+        /** 재생 뒤의 시도면 그 재생 id. 원래 시도는 null */
+        Long replayId,
         Instant startedAt,
         Integer durationMs,
         Integer responseStatus,

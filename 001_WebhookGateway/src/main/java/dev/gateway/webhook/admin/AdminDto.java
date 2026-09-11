@@ -60,6 +60,7 @@ public final class AdminDto {
             int maxAttempts,
             int retentionDays,
             boolean enabled,
+            boolean idempotencyConfirmed,
             boolean hasPreviousSecret,
             Instant secretRotatedAt,
             Instant createdAt
@@ -67,7 +68,7 @@ public final class AdminDto {
         public static EndpointView of(Endpoint e) {
             return new EndpointView(e.id(), e.slug(), e.provider(), e.targetUrl(),
                     e.signatureMode().name(), e.maxAttempts(), e.retentionDays(), e.enabled(),
-                    e.secretPrevious() != null, e.secretRotatedAt(), e.createdAt());
+                    e.idempotencyConfirmed(), e.secretPrevious() != null, e.secretRotatedAt(), e.createdAt());
         }
     }
 
@@ -84,12 +85,13 @@ public final class AdminDto {
             Instant nextAttemptAt,
             Instant receivedAt,
             Instant updatedAt,
-            Long replayOf
+            int replayCount,
+            Long lastReplayId
     ) {
         public static EventView of(Event e) {
             return new EventView(e.id(), e.endpointId(), e.idempotencyKey(), e.idempotencySource().name(),
                     e.bodySize(), e.contentType(), e.status().name(), e.attemptCount(), e.lastBackoffMs(),
-                    e.nextAttemptAt(), e.receivedAt(), e.updatedAt(), e.replayOf());
+                    e.nextAttemptAt(), e.receivedAt(), e.updatedAt(), e.replayCount(), e.lastReplayId());
         }
     }
 
@@ -122,6 +124,7 @@ public final class AdminDto {
 
     public record AttemptView(
             int attemptNo,
+            Long replayId,
             Instant startedAt,
             Integer durationMs,
             Integer responseStatus,
@@ -131,7 +134,7 @@ public final class AdminDto {
             String errorMessage
     ) {
         public static AttemptView of(DeliveryAttempt a) {
-            return new AttemptView(a.attemptNo(), a.startedAt(), a.durationMs(),
+            return new AttemptView(a.attemptNo(), a.replayId(), a.startedAt(), a.durationMs(),
                     a.responseStatus(), a.outcome().name(),
                     a.failureClass() == null ? null : a.failureClass().name(),
                     a.backoffMs(), a.errorMessage());

@@ -24,7 +24,7 @@ public class EventRepository {
     private static final String COLUMNS = """
             id, endpoint_id, idempotency_key, idempotency_source, raw_body, raw_headers,
             content_type, body_size, status, attempt_count, last_backoff_ms,
-            next_attempt_at, received_at, updated_at, replay_of
+            next_attempt_at, received_at, updated_at, replay_count, last_replay_id
             """;
 
     private final JdbcClient jdbc;
@@ -159,22 +159,24 @@ public class EventRepository {
     }
 
     /**
+     * @param replayId     재생 뒤의 시도면 그 재생 id. 원래 시도는 null
      * @param outcome      판정 — 재시도할지
      * @param failureClass 원인 — 어느 단계에서 끝났나. outcome 과 독립이다
      * @param backoffMs    이 시도 뒤에 기다리기로 한 시간. RETRY 가 아니면 null
      */
-    public void recordAttempt(long eventId, int attemptNo, Instant startedAt, long durationMs,
+    public void recordAttempt(long eventId, int attemptNo, Long replayId, Instant startedAt, long durationMs,
                               Integer responseStatus, DeliveryOutcome outcome, FailureClass failureClass,
                               Long backoffMs, String errorMessage) {
         jdbc.sql("""
                         INSERT INTO delivery_attempt
-                            (event_id, attempt_no, started_at, duration_ms, response_status,
+                            (event_id, attempt_no, replay_id, started_at, duration_ms, response_status,
                              outcome, failure_class, backoff_ms, error_message)
-                        VALUES (:eventId, :attemptNo, :startedAt, :durationMs, :responseStatus,
+                        VALUES (:eventId, :attemptNo, :replayId, :startedAt, :durationMs, :responseStatus,
                                 :outcome, :failureClass, :backoffMs, :error)
                         """)
                 .param("eventId", eventId)
                 .param("attemptNo", attemptNo)
+                .param("replayId", replayId)
                 .param("startedAt", Timestamp.from(startedAt))
                 .param("durationMs", (int) Math.min(durationMs, Integer.MAX_VALUE))
                 .param("responseStatus", responseStatus)
@@ -187,17 +189,19 @@ public class EventRepository {
 
     public List<DeliveryAttempt> findAttempts(long eventId) {
         return jdbc.sql("""
-                        SELECT id, event_id, attempt_no, started_at, duration_ms,
+                        SELECT id, event_id, attempt_no, replay_id, started_at, duration_ms,
                                response_status, outcome, failure_class, backoff_ms, error_message
                           FROM delivery_attempt
                          WHERE event_id = :eventId
-                         ORDER BY attempt_no
+                         ORDER BY id
                         """)
+                // attempt_no 는 재생하면 1 부터 다시 시작해 겹친다. 기록 순서(id)가 곧 시간 순서다.
                 .param("eventId", eventId)
                 .query((rs, n) -> new DeliveryAttempt(
                         rs.getLong("id"),
                         rs.getLong("event_id"),
                         rs.getInt("attempt_no"),
+                        (Long) rs.getObject("replay_id"),
                         EndpointRepository.instant(rs, "started_at"),
                         (Integer) rs.getObject("duration_ms"),
                         (Integer) rs.getObject("response_status"),
@@ -262,7 +266,8 @@ public class EventRepository {
                 EndpointRepository.instant(rs, "next_attempt_at"),
                 EndpointRepository.instant(rs, "received_at"),
                 EndpointRepository.instant(rs, "updated_at"),
-                (Long) rs.getObject("replay_of")
+                rs.getInt("replay_count"),
+                (Long) rs.getObject("last_replay_id")
         );
     }
 

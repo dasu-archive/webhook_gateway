@@ -14,6 +14,8 @@ public record Endpoint(
         int maxAttempts,
         int retentionDays,
         boolean enabled,
+        /** 재생 가드 4번. 소비자가 X-Gateway-Event-Id 로 멱등 처리한다고 선언했는가 */
+        boolean idempotencyConfirmed,
         Instant createdAt
 ) {
     /**

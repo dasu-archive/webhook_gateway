@@ -18,5 +18,8 @@ public record Event(
         Instant nextAttemptAt,
         Instant receivedAt,
         Instant updatedAt,
-        Long replayOf
+        /** 재생된 횟수. 0 이 아니면 소비자에게 X-Gateway-Replay: true 가 붙는다 */
+        int replayCount,
+        /** 마지막으로 이 이벤트를 옮긴 재생. 재생 뒤 시도는 이 값을 delivery_attempt.replay_id 에 남긴다 */
+        Long lastReplayId
 ) {}

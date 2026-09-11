@@ -20,7 +20,7 @@ public class EndpointRepository {
 
     private static final String COLUMNS = """
             id, slug, provider, secret_current, secret_previous, secret_rotated_at,
-            target_url, signature_mode, max_attempts, retention_days, enabled, created_at
+            target_url, signature_mode, max_attempts, retention_days, enabled, idempotency_confirmed, created_at
             """;
 
     public Optional<Endpoint> findBySlug(String slug) {
@@ -87,6 +87,13 @@ public class EndpointRepository {
                 .update();
     }
 
+    public void setIdempotencyConfirmed(long id, boolean confirmed) {
+        jdbc.sql("UPDATE endpoint SET idempotency_confirmed = :confirmed WHERE id = :id")
+                .param("confirmed", confirmed)
+                .param("id", id)
+                .update();
+    }
+
     private static Endpoint map(ResultSet rs, int rowNum) throws SQLException {
         return new Endpoint(
                 rs.getLong("id"),
@@ -100,6 +107,7 @@ public class EndpointRepository {
                 rs.getInt("max_attempts"),
                 rs.getInt("retention_days"),
                 rs.getBoolean("enabled"),
+                rs.getBoolean("idempotency_confirmed"),
                 instant(rs, "created_at")
         );
     }
