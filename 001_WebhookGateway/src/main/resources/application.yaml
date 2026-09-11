@@ -26,7 +26,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # prometheus 는 compose 의 Prometheus 가 5초마다 긁어간다 (000_Infra/docker/prometheus)
+        include: health,info,metrics,prometheus
 
 logging:
   level:

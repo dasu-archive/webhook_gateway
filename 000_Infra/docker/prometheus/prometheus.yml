@@ -1,0 +1,11 @@
+# 게이트웨이 지표 수집. 대상은 compose 네트워크 안의 서비스 이름이다.
+global:
+  # 카오스 시나리오가 분 단위라 기본값(1m)이면 곡선이 뭉개진다
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: webhook-gateway
+    # 어드민 포트 분리(:9090) 후엔 targets 만 gateway:9090 으로 바꾼다
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["gateway:8080"]

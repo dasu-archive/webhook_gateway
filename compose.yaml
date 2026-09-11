@@ -69,5 +69,36 @@ services:
       retries: 20
       start_period: 30s
 
+  # 지표 수집. UI: http://localhost:9091
+  # 호스트 9090 은 게이트웨이 어드민 포트 분리(:9090) 몫으로 비워둔다.
+  # gateway 에 depends_on 을 걸지 않는다 — 게이트웨이 없이도 뜨고 target 만 DOWN 으로 보인다.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: wg-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./000_Infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  # 대시보드. UI: http://localhost:3000 (admin / admin)
+  # 패널을 어드민 콘솔에 iframe 으로 embed 할 예정이라 embed 와 익명 조회를 켰다. 로컬 전용 설정이다.
+  grafana:
+    image: grafana/grafana:12.1.0
+    container_name: wg-grafana
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./000_Infra/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   mysql-data:
+  prometheus-data:
+  grafana-data:
