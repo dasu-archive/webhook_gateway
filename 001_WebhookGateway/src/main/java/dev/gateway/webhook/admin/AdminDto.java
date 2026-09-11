@@ -126,11 +126,15 @@ public final class AdminDto {
             Integer durationMs,
             Integer responseStatus,
             String outcome,
+            String failureClass,
+            Integer backoffMs,
             String errorMessage
     ) {
         public static AttemptView of(DeliveryAttempt a) {
             return new AttemptView(a.attemptNo(), a.startedAt(), a.durationMs(),
-                    a.responseStatus(), a.outcome().name(), a.errorMessage());
+                    a.responseStatus(), a.outcome().name(),
+                    a.failureClass() == null ? null : a.failureClass().name(),
+                    a.backoffMs(), a.errorMessage());
         }
     }
 }

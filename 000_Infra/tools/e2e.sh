@@ -66,7 +66,7 @@ $MYSQL -t webhook_gateway -e \
   "SELECT id, status, attempt_count FROM event WHERE idempotency_key = '${DELIVERY}';"
 echo "  전달 시도:"
 $MYSQL -t webhook_gateway -e \
-  "SELECT event_id, attempt_no, response_status, outcome, duration_ms FROM delivery_attempt ORDER BY id DESC LIMIT 3;"
+  "SELECT event_id, attempt_no, response_status, outcome, failure_class, backoff_ms, duration_ms FROM delivery_attempt ORDER BY id DESC LIMIT 3;"
 echo "  소비자 잔액과 처리 기록:"
 $MYSQL -t webhook_service -e "SELECT id, balance FROM account WHERE id = 1;"
 $MYSQL -t webhook_service -e "SELECT gateway_event_id, order_id FROM processed_event;"

@@ -7,6 +7,7 @@ import dev.gateway.webhook.ledger.DeliveryOutcome;
 import dev.gateway.webhook.ledger.EndpointRepository;
 import dev.gateway.webhook.ledger.EventRepository;
 import dev.gateway.webhook.ledger.EventStatus;
+import dev.gateway.webhook.ledger.FailureClass;
 import dev.gateway.webhook.ledger.IdempotencySource;
 import dev.gateway.webhook.ledger.SignatureMode;
 import org.junit.jupiter.api.AfterAll;
@@ -19,6 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -145,7 +148,9 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         var attempts = events.findAttempts(eventId);
         assertThat(attempts).hasSize(1);
         assertThat(attempts.get(0).outcome()).isEqualTo(DeliveryOutcome.DELIVERED);
+        assertThat(attempts.get(0).failureClass()).isEqualTo(FailureClass.SUCCESS);
         assertThat(attempts.get(0).responseStatus()).isEqualTo(200);
+        assertThat(attempts.get(0).backoffMs()).isNull();
     }
 
     @Test
@@ -164,7 +169,11 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         assertThat(event.lastBackoffMs()).isNotNull();
         assertThat(event.nextAttemptAt()).isAfterOrEqualTo(before);
 
-        assertThat(events.findAttempts(eventId).get(0).outcome()).isEqualTo(DeliveryOutcome.RETRY);
+        var attempt = events.findAttempts(eventId).get(0);
+        assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.RETRY);
+        assertThat(attempt.failureClass()).isEqualTo(FailureClass.HTTP_5XX);
+        // 시도 이력의 대기 시간이 이벤트에 실제로 걸린 대기 시간과 같아야 지터 비교(A-2)에 쓸 수 있다.
+        assertThat(attempt.backoffMs()).isEqualTo(event.lastBackoffMs());
     }
 
     @Test
@@ -203,7 +212,10 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         assertThat(event.status()).isEqualTo(EventStatus.DEAD);
         // 시도 한도가 8인데도 한 번 만에 끝난다 — 재시도해도 결과가 같기 때문이다(설계 8.1.1).
         assertThat(event.attemptCount()).isEqualTo(1);
-        assertThat(events.findAttempts(eventId).get(0).outcome()).isEqualTo(DeliveryOutcome.DEAD);
+        var attempt = events.findAttempts(eventId).get(0);
+        assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.DEAD);
+        assertThat(attempt.failureClass()).isEqualTo(FailureClass.HTTP_4XX);
+        assertThat(attempt.backoffMs()).isNull();
     }
 
     @Test
@@ -216,6 +228,10 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         runOneCycle();
 
         assertThat(events.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PENDING);
+        // 원인은 4xx 인데 판정은 재시도다. outcome 과 failure_class 를 한 컬럼으로 합쳤다면 이 줄을 쓸 수 없다.
+        var attempt = events.findAttempts(eventId).get(0);
+        assertThat(attempt.failureClass()).isEqualTo(FailureClass.HTTP_4XX);
+        assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.RETRY);
     }
 
     @Test
@@ -233,7 +249,13 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         var event = events.findById(eventId).orElseThrow();
         assertThat(event.status()).isEqualTo(EventStatus.DEAD);
         assertThat(event.attemptCount()).isEqualTo(3);
-        assertThat(events.findAttempts(eventId)).hasSize(3);
+        var attempts = events.findAttempts(eventId);
+        assertThat(attempts).hasSize(3);
+        // 원인은 세 번 다 5xx 이고 판정만 마지막에 DEAD 로 바뀐다.
+        var last = attempts.get(2);
+        assertThat(last.outcome()).isEqualTo(DeliveryOutcome.DEAD);
+        assertThat(last.failureClass()).isEqualTo(FailureClass.HTTP_5XX);
+        assertThat(last.backoffMs()).isNull();
     }
 
     @Test
@@ -250,8 +272,48 @@ class DispatchIntegrationTest extends IntegrationTestBase {
         assertThat(event.status()).isEqualTo(EventStatus.PENDING);
         var attempt = events.findAttempts(eventId).get(0);
         assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.RETRY);
+        assertThat(attempt.failureClass()).isEqualTo(FailureClass.CONN_REFUSED);
         assertThat(attempt.responseStatus()).isNull();
         assertThat(attempt.errorMessage()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("호스트 이름이 안 풀리면 DNS_FAIL — 최상위 예외는 커넥션 거부와 똑같은 ConnectException 이다")
+    void classifiesDnsFailure() {
+        // .invalid 는 절대 해석되지 않도록 예약된 TLD 다(RFC 2606).
+        long endpointId = endpoints.insert("nowhere", "github", "topsecret-secret-1234".getBytes(StandardCharsets.UTF_8),
+                "http://consumer.invalid/consume", SignatureMode.PASSTHROUGH, 8, 7);
+        long eventId = enqueue(endpointId, "d-1");
+
+        runOneCycle();
+
+        var attempt = events.findAttempts(eventId).get(0);
+        assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.RETRY);
+        assertThat(attempt.failureClass()).isEqualTo(FailureClass.DNS_FAIL);
+    }
+
+    @Test
+    @DisplayName("요청을 받고 응답 없이 끊으면 CONN_RESET — 소비자 응답 드롭이 게이트웨이에는 이렇게 보인다")
+    void classifiesDroppedConnection() throws IOException {
+        try (var dropper = new ServerSocket(0)) {
+            Thread.ofVirtual().start(() -> {
+                try (Socket s = dropper.accept()) {
+                    // 요청을 읽고(소비자라면 여기서 처리를 끝냈을 것이다) 응답 없이 닫는다.
+                    s.getInputStream().read(new byte[8192]);
+                } catch (IOException ignored) {
+                }
+            });
+            long endpointId = endpoints.insert("dropper", "github", "topsecret-secret-1234".getBytes(StandardCharsets.UTF_8),
+                    "http://localhost:" + dropper.getLocalPort() + "/consume", SignatureMode.PASSTHROUGH, 8, 7);
+            long eventId = enqueue(endpointId, "d-1");
+
+            runOneCycle();
+
+            var attempt = events.findAttempts(eventId).get(0);
+            assertThat(attempt.outcome()).isEqualTo(DeliveryOutcome.RETRY);
+            assertThat(attempt.failureClass()).isEqualTo(FailureClass.CONN_RESET);
+            assertThat(attempt.responseStatus()).isNull();
+        }
     }
 
     @Test

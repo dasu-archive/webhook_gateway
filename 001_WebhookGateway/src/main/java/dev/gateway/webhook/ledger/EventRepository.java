@@ -158,12 +158,20 @@ public class EventRepository {
                 .update();
     }
 
+    /**
+     * @param outcome      판정 — 재시도할지
+     * @param failureClass 원인 — 어느 단계에서 끝났나. outcome 과 독립이다
+     * @param backoffMs    이 시도 뒤에 기다리기로 한 시간. RETRY 가 아니면 null
+     */
     public void recordAttempt(long eventId, int attemptNo, Instant startedAt, long durationMs,
-                              Integer responseStatus, DeliveryOutcome outcome, String errorMessage) {
+                              Integer responseStatus, DeliveryOutcome outcome, FailureClass failureClass,
+                              Long backoffMs, String errorMessage) {
         jdbc.sql("""
                         INSERT INTO delivery_attempt
-                            (event_id, attempt_no, started_at, duration_ms, response_status, outcome, error_message)
-                        VALUES (:eventId, :attemptNo, :startedAt, :durationMs, :responseStatus, :outcome, :error)
+                            (event_id, attempt_no, started_at, duration_ms, response_status,
+                             outcome, failure_class, backoff_ms, error_message)
+                        VALUES (:eventId, :attemptNo, :startedAt, :durationMs, :responseStatus,
+                                :outcome, :failureClass, :backoffMs, :error)
                         """)
                 .param("eventId", eventId)
                 .param("attemptNo", attemptNo)
@@ -171,6 +179,8 @@ public class EventRepository {
                 .param("durationMs", (int) Math.min(durationMs, Integer.MAX_VALUE))
                 .param("responseStatus", responseStatus)
                 .param("outcome", outcome.name())
+                .param("failureClass", failureClass.name())
+                .param("backoffMs", backoffMs == null ? null : (int) Math.min(backoffMs, Integer.MAX_VALUE))
                 .param("error", truncate(errorMessage, 512))
                 .update();
     }
@@ -178,7 +188,7 @@ public class EventRepository {
     public List<DeliveryAttempt> findAttempts(long eventId) {
         return jdbc.sql("""
                         SELECT id, event_id, attempt_no, started_at, duration_ms,
-                               response_status, outcome, error_message
+                               response_status, outcome, failure_class, backoff_ms, error_message
                           FROM delivery_attempt
                          WHERE event_id = :eventId
                          ORDER BY attempt_no
@@ -192,8 +202,15 @@ public class EventRepository {
                         (Integer) rs.getObject("duration_ms"),
                         (Integer) rs.getObject("response_status"),
                         DeliveryOutcome.valueOf(rs.getString("outcome")),
+                        failureClass(rs.getString("failure_class")),
+                        (Integer) rs.getObject("backoff_ms"),
                         rs.getString("error_message")))
                 .list();
+    }
+
+    /** V2 이전 행은 NULL 이다. */
+    private static FailureClass failureClass(String value) {
+        return value == null ? null : FailureClass.valueOf(value);
     }
 
     public List<Event> search(Long endpointId, EventStatus status, int limit, long afterId) {

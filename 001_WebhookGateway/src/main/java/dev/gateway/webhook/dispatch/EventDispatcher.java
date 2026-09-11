@@ -7,6 +7,7 @@ import dev.gateway.webhook.ledger.Endpoint;
 import dev.gateway.webhook.ledger.EndpointRepository;
 import dev.gateway.webhook.ledger.Event;
 import dev.gateway.webhook.ledger.EventRepository;
+import dev.gateway.webhook.ledger.FailureClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -66,7 +67,7 @@ public class EventDispatcher {
         Endpoint endpoint = endpoints.findById(event.endpointId()).orElse(null);
         if (endpoint == null) {
             log.error("이벤트 {} 의 엔드포인트 {} 가 없다. DEAD 로 보낸다", eventId, event.endpointId());
-            fail(event, null, null, "엔드포인트 소실", 1, Instant.now(clock), true);
+            fail(event, null, null, FailureClass.OTHER, "엔드포인트 소실", 1, Instant.now(clock), true);
             return;
         }
 
@@ -83,8 +84,9 @@ public class EventDispatcher {
             events.scheduleRetry(event.id(), clock.instant(), 0);
         } catch (Exception e) {
             // 커넥션 거부, 타임아웃, DNS 실패. 전부 "소비자 사정이 잠깐 나쁜 것"이라 재시도가 유효하다(설계 8.1.1).
+            // 판정은 같고 원인만 FailureClassifier 가 나눠 남긴다.
             long durationMs = elapsedMs(startNanos);
-            fail(event, endpoint, null, describe(e), durationMs, startedAt, false);
+            fail(event, endpoint, null, FailureClassifier.ofException(e), describe(e), durationMs, startedAt, false);
         }
     }
 
@@ -114,9 +116,10 @@ public class EventDispatcher {
     }
 
     private void handleResponse(Event event, Endpoint endpoint, int status, long durationMs, Instant startedAt) {
-        if (status >= 200 && status < 300) {
+        FailureClass failureClass = FailureClassifier.ofStatus(status);
+        if (failureClass == FailureClass.SUCCESS) {
             events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
-                    status, DeliveryOutcome.DELIVERED, null);
+                    status, DeliveryOutcome.DELIVERED, failureClass, null, null);
             events.markDelivered(event.id());
             log.debug("전달 성공 event={} status={} {}ms", event.id(), status, durationMs);
             return;
@@ -126,29 +129,29 @@ public class EventDispatcher {
         // 다만 408/429 는 "지금은 안 된다"는 뜻이라 예외로 둔다. 이 두 개를 DEAD 로 보내면
         // 소비자가 스로틀링만 해도 이벤트를 잃는다.
         boolean permanent = status >= 400 && status < 500 && status != 408 && status != 429;
-        fail(event, endpoint, status, "소비자 응답 " + status, durationMs, startedAt, permanent);
+        fail(event, endpoint, status, failureClass, "소비자 응답 " + status, durationMs, startedAt, permanent);
     }
 
-    private void fail(Event event, Endpoint endpoint, Integer status, String error,
+    private void fail(Event event, Endpoint endpoint, Integer status, FailureClass failureClass, String error,
                       long durationMs, Instant startedAt, boolean permanent) {
         int maxAttempts = endpoint == null ? 1 : endpoint.maxAttempts();
         boolean exhausted = event.attemptCount() >= maxAttempts;
 
         if (permanent || exhausted) {
             events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
-                    status, DeliveryOutcome.DEAD, error);
+                    status, DeliveryOutcome.DEAD, failureClass, null, error);
             events.markDead(event.id());
             // 데드레터 진입 자체가 알림 이벤트다(설계 8.5). 알림 없는 데드레터는 아무도 보지 않는 무덤이 된다.
-            log.error("DEAD event={} endpoint={} attempts={}/{} 사유={} ({})",
+            log.error("DEAD event={} endpoint={} attempts={}/{} 원인={} 사유={} ({})",
                     event.id(), endpoint == null ? "?" : endpoint.slug(),
-                    event.attemptCount(), maxAttempts, error,
+                    event.attemptCount(), maxAttempts, failureClass, error,
                     permanent ? "영구 실패" : "재시도 소진");
             return;
         }
 
         Duration delay = backoff.next(event.attemptCount(), event.lastBackoffMs());
         events.recordAttempt(event.id(), event.attemptCount(), startedAt, durationMs,
-                status, DeliveryOutcome.RETRY, error);
+                status, DeliveryOutcome.RETRY, failureClass, delay.toMillis(), error);
         events.scheduleRetry(event.id(), clock.instant().plus(delay), delay.toMillis());
         log.debug("재시도 예약 event={} attempt={}/{} delay={}ms 사유={}",
                 event.id(), event.attemptCount(), maxAttempts, delay.toMillis(), error);
