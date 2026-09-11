@@ -7,7 +7,7 @@ spring:
     password: root
     hikari:
       maximum-pool-size: 20
-      pool-name: gateway-pool
+      pool-name: service-pool
   flyway:
     enabled: true
     baseline-on-migrate: true

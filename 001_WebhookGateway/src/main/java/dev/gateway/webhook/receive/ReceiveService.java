@@ -91,7 +91,7 @@ public class ReceiveService {
             return ReceiveOutcome.accepted(id);
         } catch (DuplicateKeyException e) {
             // 조회 후 삽입은 동시 삽입에서 둘 다 통과한다. 유니크 인덱스로만 막는다. 설계 7.4
-            log.debug("중복 수신 slug={} key={}", slug, idempotencyKey);
+            log.info("중복 수신 slug={} key={}", slug, idempotencyKey);
             return ReceiveOutcome.duplicate(idempotencyKey);
         }
     }

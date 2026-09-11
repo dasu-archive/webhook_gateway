@@ -38,7 +38,7 @@ public final class AdminDto {
             @Min(1) @Max(365) Integer retentionDays
     ) {
         public int maxAttemptsOrDefault() {
-            return maxAttempts == null ? 8 : maxAttempts;
+            return maxAttempts == null ? 12 : maxAttempts;
         }
 
         public int retentionDaysOrDefault() {

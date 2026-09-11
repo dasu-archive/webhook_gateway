@@ -16,7 +16,7 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
+// 서명인증 테스트
 class SignatureVerifierTest {
 
     private static final byte[] SECRET = "topsecret-secret-1234".getBytes(StandardCharsets.UTF_8);
@@ -28,7 +28,7 @@ class SignatureVerifierTest {
     @DisplayName("GitHub: 올바른 서명은 통과한다")
     void githubValid() {
         var headers = new HttpHeaders();
-        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hexSha256(SECRET, BODY));
+        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hmacSha256Hex(SECRET, BODY));
 
         assertThat(github.verify(BODY, headers, EndpointSecrets.of(SECRET)).valid()).isTrue();
     }
@@ -37,7 +37,7 @@ class SignatureVerifierTest {
     @DisplayName("GitHub: 바디가 1바이트만 달라도 서명이 깨진다")
     void githubRejectsAlteredBody() {
         var headers = new HttpHeaders();
-        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hexSha256(SECRET, BODY));
+        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hmacSha256Hex(SECRET, BODY));
 
         // 공백 하나를 지운 바디. 눈으로는 같은 JSON 이지만 다른 바이트다 — 설계 2.4 의 핵심.
         byte[] reserialized = "{\"orderId\":123,\"status\":\"DONE\"}".getBytes(StandardCharsets.UTF_8);
@@ -58,7 +58,7 @@ class SignatureVerifierTest {
         byte[] newSecret = "new-secret-1111111111".getBytes(StandardCharsets.UTF_8);
 
         var headers = new HttpHeaders();
-        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hexSha256(oldSecret, BODY));
+        headers.add(GithubSignatureVerifier.SIGNATURE_HEADER, "sha256=" + Hmac.hmacSha256Hex(oldSecret, BODY));
 
         assertThat(github.verify(BODY, headers, new EndpointSecrets(newSecret, oldSecret)).valid()).isTrue();
         // 유예가 끝나면 후보에서 빠지고 더 이상 통과하지 않는다.

@@ -83,7 +83,7 @@ curl -X POST localhost:8080/admin/endpoints \
         "provider": "github",
         "secret": "topsecret-secret-1234",
         "targetUrl": "http://localhost:9090/consume",
-        "maxAttempts": 8
+        "maxAttempts": 12
       }'
 ```
 

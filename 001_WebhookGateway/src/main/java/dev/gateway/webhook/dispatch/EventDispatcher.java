@@ -94,7 +94,8 @@ public class EventDispatcher {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(event.rawBody()));
 
         // PASSTHROUGH: 제공자의 원본 헤더를 그대로 넘긴다. 소비자의 기존 서명 검증 코드를
-        // 건드리지 않고 도입하기 위해서다(설계 9.5). 대신 재생은 타임스탬프 윈도우 때문에 불가하다.
+        // 건드리지 않고 도입하기 위해서다(설계 9.5). 대신 타임스탬프가 서명에 들어가는 제공자(standard)는
+        // 재생하면 소비자의 윈도우 검사에 걸린다. GitHub 은 타임스탬프가 없어 PASSTHROUGH 로도 재생된다.
         event.rawHeaders().forEach((name, value) -> {
             if (HeaderPolicy.forwardable(name)) {
                 builder.header(name, value);

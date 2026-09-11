@@ -50,7 +50,7 @@ class ReceiveIntegrationTest extends IntegrationTestBase {
     }
 
     private static String sign(String body) {
-        return "sha256=" + Hmac.hexSha256(SECRET.getBytes(StandardCharsets.UTF_8),
+        return "sha256=" + Hmac.hmacSha256Hex(SECRET.getBytes(StandardCharsets.UTF_8),
                 body.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -223,7 +223,7 @@ class ReceiveIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk());
 
         // 새 시크릿도 물론 통과한다.
-        String newSignature = "sha256=" + Hmac.hexSha256(
+        String newSignature = "sha256=" + Hmac.hmacSha256Hex(
                 "brand-new-secret-9999".getBytes(StandardCharsets.UTF_8),
                 BODY.getBytes(StandardCharsets.UTF_8));
         mockMvc.perform(post("/webhooks/gh-push")

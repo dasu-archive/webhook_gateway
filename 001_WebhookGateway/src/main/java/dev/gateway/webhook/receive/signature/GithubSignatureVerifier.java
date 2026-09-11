@@ -41,7 +41,7 @@ public class GithubSignatureVerifier implements SignatureVerifier {
         String receivedHex = received.substring(PREFIX.length());
 
         for (byte[] secret : secrets.candidates()) {
-            if (Hmac.constantTimeEquals(receivedHex, Hmac.hexSha256(secret, rawBody))) {
+            if (Hmac.constantTimeEquals(receivedHex, Hmac.hmacSha256Hex(secret, rawBody))) {
                 return VerificationResult.ok();
             }
         }

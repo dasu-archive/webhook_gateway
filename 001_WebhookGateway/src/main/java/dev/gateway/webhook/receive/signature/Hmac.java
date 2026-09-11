@@ -25,7 +25,8 @@ public final class Hmac {
         }
     }
 
-    public static String hexSha256(byte[] secret, byte[] message) {
+    /** HMAC-SHA256 을 hex 로. 키 없는 {@link #sha256Hex(byte[])} 와 헷갈리지 않게 이름에 hmac 을 붙였다. */
+    public static String hmacSha256Hex(byte[] secret, byte[] message) {
         return HEX.formatHex(sha256(secret, message));
     }
 
@@ -46,6 +47,7 @@ public final class Hmac {
         return a != null && b != null && MessageDigest.isEqual(a, b);
     }
 
+    /** 키 없는 SHA-256. 인증이 아니라 제공자 ID 가 없을 때의 멱등키 대체용이다(설계 7.3). */
     public static String sha256Hex(byte[] message) {
         try {
             return HEX.formatHex(MessageDigest.getInstance("SHA-256").digest(message));
